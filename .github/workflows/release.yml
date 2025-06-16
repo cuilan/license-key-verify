@@ -1,0 +1,84 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 创建发布
+    runs-on: ubuntu-latest
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 设置 Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.23'
+
+    - name: 缓存 Go 模块
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: 下载依赖
+      run: make deps
+
+    - name: 运行测试
+      run: make test
+
+    - name: 创建发布包
+      run: make release
+
+    - name: 生成变更日志
+      id: changelog
+      run: |
+        # 获取上一个标签
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        # 生成变更日志
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "## 变更内容" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> CHANGELOG.md
+        else
+          echo "## 首次发布" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "这是项目的首次发布版本。" >> CHANGELOG.md
+        fi
+        
+        # 输出变更日志内容
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat CHANGELOG.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: 创建 GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ github.ref_name }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        files: |
+          dist/release/*.tar.gz
+        draft: false
+        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: 上传发布产物
+      uses: actions/upload-artifact@v3
+      with:
+        name: release-packages
+        path: dist/release/
+        retention-days: 90 

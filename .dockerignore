@@ -1,0 +1,38 @@
+# Git
+.git
+.gitignore
+
+# 构建产物
+bin/
+dist/
+*.lic
+keys/
+demo/
+
+# 测试和覆盖率文件
+*.out
+coverage.html
+
+# IDE 文件
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.temp
+
+# 文档
+*.md
+!README.md
+
+# GitHub Actions
+.github/ 

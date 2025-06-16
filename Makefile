@@ -24,7 +24,7 @@ BIN_DIR = bin
 # 目标平台
 PLATFORMS = darwin/amd64,darwin/arm64,linux/amd64,linux/arm64,windows/amd64
 
-.PHONY: all build build-all clean test deps help
+.PHONY: all build build-all clean test deps help install uninstall release
 
 # 默认目标
 all: clean deps test build
@@ -59,9 +59,24 @@ build-all:
 # 安装到系统路径
 install: build
 	@echo "安装到系统路径..."
+	@if [ "$(shell id -u)" -ne 0 ]; then \
+		echo "错误: 需要 root 权限来安装"; \
+		exit 1; \
+	fi
 	@cp $(BIN_DIR)/lkctl /usr/local/bin/
 	@cp $(BIN_DIR)/lkverify /usr/local/bin/
 	@echo "安装完成!"
+
+# 从系统路径卸载
+uninstall:
+	@echo "从系统路径卸载..."
+	@if [ "$(shell id -u)" -ne 0 ]; then \
+		echo "错误: 需要 root 权限来卸载"; \
+		exit 1; \
+	fi
+	@rm -f /usr/local/bin/lkctl
+	@rm -f /usr/local/bin/lkverify
+	@echo "卸载完成!"
 
 # 清理构建文件
 clean:
@@ -132,17 +147,37 @@ release: build-all
 		os=$$(echo $$platform | cut -d'/' -f1); \
 		arch=$$(echo $$platform | cut -d'/' -f2); \
 		release_name="$(PROJECT_NAME)_$(VERSION)_$${os}_$${arch}"; \
+		echo "打包 $$release_name..."; \
 		mkdir -p $(DIST_DIR)/release/$$release_name; \
 		if [ "$$os" = "windows" ]; then \
-			cp $(DIST_DIR)/lkctl_$${os}_$${arch}.exe $(DIST_DIR)/release/$$release_name/lkctl.exe; \
-			cp $(DIST_DIR)/lkverify_$${os}_$${arch}.exe $(DIST_DIR)/release/$$release_name/lkverify.exe; \
+			if [ -f "$(DIST_DIR)/lkctl_$${os}_$${arch}.exe" ]; then \
+				cp $(DIST_DIR)/lkctl_$${os}_$${arch}.exe $(DIST_DIR)/release/$$release_name/lkctl.exe; \
+			else \
+				echo "警告: $(DIST_DIR)/lkctl_$${os}_$${arch}.exe 不存在"; \
+			fi; \
+			if [ -f "$(DIST_DIR)/lkverify_$${os}_$${arch}.exe" ]; then \
+				cp $(DIST_DIR)/lkverify_$${os}_$${arch}.exe $(DIST_DIR)/release/$$release_name/lkverify.exe; \
+			else \
+				echo "警告: $(DIST_DIR)/lkverify_$${os}_$${arch}.exe 不存在"; \
+			fi; \
 		else \
-			cp $(DIST_DIR)/lkctl_$${os}_$${arch} $(DIST_DIR)/release/$$release_name/lkctl; \
-			cp $(DIST_DIR)/lkverify_$${os}_$${arch} $(DIST_DIR)/release/$$release_name/lkverify; \
+			if [ -f "$(DIST_DIR)/lkctl_$${os}_$${arch}" ]; then \
+				cp $(DIST_DIR)/lkctl_$${os}_$${arch} $(DIST_DIR)/release/$$release_name/lkctl; \
+				chmod +x $(DIST_DIR)/release/$$release_name/lkctl; \
+			else \
+				echo "警告: $(DIST_DIR)/lkctl_$${os}_$${arch} 不存在"; \
+			fi; \
+			if [ -f "$(DIST_DIR)/lkverify_$${os}_$${arch}" ]; then \
+				cp $(DIST_DIR)/lkverify_$${os}_$${arch} $(DIST_DIR)/release/$$release_name/lkverify; \
+				chmod +x $(DIST_DIR)/release/$$release_name/lkverify; \
+			else \
+				echo "警告: $(DIST_DIR)/lkverify_$${os}_$${arch} 不存在"; \
+			fi; \
 		fi; \
-		cp README.md $(DIST_DIR)/release/$$release_name/; \
-		cd $(DIST_DIR)/release && tar -czf $$release_name.tar.gz $$release_name/; \
-		rm -rf $$release_name; \
+		if [ -f "README.md" ]; then \
+			cp README.md $(DIST_DIR)/release/$$release_name/; \
+		fi; \
+		(cd $(DIST_DIR)/release && tar -czf $$release_name.tar.gz $$release_name/ && rm -rf $$release_name); \
 	done
 	@echo "发布包已创建到 $(DIST_DIR)/release/ 目录"
 
@@ -155,6 +190,7 @@ help:
 	@echo "  build        - 构建当前平台的二进制文件"
 	@echo "  build-all    - 构建所有平台的二进制文件"
 	@echo "  install      - 安装到系统路径"
+	@echo "  uninstall    - 从系统路径卸载"
 	@echo "  clean        - 清理构建文件"
 	@echo "  test         - 运行测试"
 	@echo "  test-coverage- 运行测试并生成覆盖率报告"

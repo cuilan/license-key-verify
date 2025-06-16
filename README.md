@@ -1,5 +1,11 @@
 # License Key Verify Tool
 
+[![CI](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml)
+[![Release](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml)
+[![Docker](https://github.com/cuilan/license-key-verify/actions/workflows/docker.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/docker.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/cuilan/license-key-verify)](https://goreportcard.com/report/github.com/cuilan/license-key-verify)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 一个功能完整的许可证密钥生成、验证工具，支持机器绑定和数字签名。
 
 ## 功能特性

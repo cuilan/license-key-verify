@@ -7,7 +7,6 @@
 .idea
 # Test binary, built with `go test -c`
 *.test
-go.sum
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 logs
@@ -16,4 +15,12 @@ vendor
 .DS_Store
 
 bin
+dist
+release
+demo
 vendor
+coverage.html
+coverage.out
+*.lic
+*.key
+*.pem
