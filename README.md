@@ -1,4 +1,4 @@
-# License Key Verify
+# License Key Verify Tool
 
 [![CI](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml)
 [![Release](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml)
@@ -7,6 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 一个功能完整的许可证密钥生成、验证工具，支持机器绑定和数字签名。
+
+**中文** | [English](README_EN.md)
 
 ## 功能特性
 
@@ -265,6 +267,33 @@ sudo make uninstall
 }
 ```
 
+## Docker 支持
+
+### 使用预构建镜像
+
+```bash
+# 拉取最新镜像
+docker pull ghcr.io/cuilan/license-key-verify:latest
+
+# 运行容器
+docker run --rm ghcr.io/cuilan/license-key-verify:latest --help
+
+# 挂载本地目录进行许可证操作
+docker run --rm -v $(pwd):/workspace \
+  ghcr.io/cuilan/license-key-verify:latest \
+  get mac
+```
+
+### 本地构建
+
+```bash
+# 构建镜像
+docker build -t license-key-verify .
+
+# 运行容器
+docker run --rm license-key-verify --help
+```
+
 ## 开发和贡献
 
 ### 开发环境要求
@@ -306,3 +335,16 @@ A: 支持。验证过程完全离线进行，不需要网络连接。
 ## 许可证
 
 本项目采用MIT许可证，详见LICENSE文件。
+
+## 致谢
+
+- 仅使用 Go 标准库构建
+- 使用 RSA 和 AES 加密算法
+- 受现代软件许可实践启发
+
+## 支持
+
+- 📖 [文档](docs/)
+- 🐛 [问题跟踪](https://github.com/cuilan/license-key-verify/issues)
+- 💬 [讨论区](https://github.com/cuilan/license-key-verify/discussions)
+- 📧 联系：[创建 Issue](https://github.com/cuilan/license-key-verify/issues/new)
