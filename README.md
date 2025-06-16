@@ -223,14 +223,25 @@ make test
 make demo
 ```
 
+### GitHub Actions 手动构建
+
+项目使用手动触发的 GitHub Actions 工作流：
+
+1. 访问 [GitHub Actions](https://github.com/cuilan/license-key-verify/actions)
+2. 选择 "CI" 工作流
+3. 点击 "Run workflow" 手动触发构建
+4. 可选择是否运行测试和构建所有平台
+
+详细说明请参考：[手动触发指南](docs/manual-trigger-guide.md)
+
 ### 安装到系统
 
 ```bash
 # 安装到 /usr/local/bin
-make install
+sudo make install
 
-# 需要 root 权限
-make uninstall
+# 卸载
+sudo make uninstall
 ```
 
 ## 安全特性

@@ -1,9 +1,13 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_all_platforms:
+        description: '是否发布所有平台'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
