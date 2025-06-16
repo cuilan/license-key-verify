@@ -18,29 +18,6 @@
 - ✅ **命令行工具**: 提供易用的命令行界面
 - ✅ **SDK集成**: 可作为库集成到其他项目中
 
-## 项目结构
-
-```
-license-key-verify/
-├── cmd/
-│   ├── lkctl/          # 命令行工具
-│   │   └── main.go
-│   └── lkverify/       # 验证程序
-│       └── main.go
-├── pkg/
-│   ├── license/        # 许可证核心功能
-│   │   ├── types.go
-│   │   ├── generator.go
-│   │   └── verifier.go
-│   ├── machine/        # 机器信息获取
-│   │   └── info.go
-│   └── crypto/         # 加密解密
-│       └── crypto.go
-├── Makefile           # 构建脚本
-├── go.mod             # Go模块定义
-└── README.md          # 项目文档
-```
-
 ## 快速开始
 
 ### 1. 构建项目
@@ -57,10 +34,10 @@ make build-all
 
 ```bash
 # 获取MAC地址
-./bin/lkctl get mac
+lkctl get mac
 
 # 获取系统UUID
-./bin/lkctl get uuid
+lkctl get uuid
 
 # 获取CPU ID
 ./bin/lkctl get cpuid
@@ -251,13 +228,9 @@ make demo
 ```bash
 # 安装到 /usr/local/bin
 make install
-```
 
-### 创建发布包
-
-```bash
-# 创建所有平台的发布包
-make release
+# 需要 root 权限
+make uninstall
 ```
 
 ## 安全特性
@@ -322,10 +295,3 @@ A: 支持。验证过程完全离线进行，不需要网络连接。
 ## 许可证
 
 本项目采用MIT许可证，详见LICENSE文件。
-
-## 版本历史
-
-- v1.0.0 - 初始版本
-  - 支持许可证生成和验证
-  - 支持机器绑定
-  - 提供命令行工具和SDK
