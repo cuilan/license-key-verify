@@ -145,11 +145,39 @@ Exit codes:
 go get github.com/cuilan/license-key-verify
 ```
 
-### Or Use Local Module (for development)
+### Resolve Module Path Issues
+
+If you encounter module path mismatch errors, try the following solutions:
 
 ```bash
-# Add local dependency in your project
-go mod edit -replace license-key-verify=../path/to/license-key-verify
+# Clean Go module cache
+go clean -modcache
+
+# Re-download dependency
+go get github.com/cuilan/license-key-verify@latest
+
+# Or use specific version
+go get github.com/cuilan/license-key-verify@main
+```
+
+If you still have issues, use replace directive:
+
+```bash
+# Add replace directive in your project
+go mod edit -replace github.com/cuilan/license-key-verify=github.com/cuilan/license-key-verify@main
+go mod tidy
+```
+
+### Local Development Mode
+
+If you need to develop and test locally:
+
+```bash
+# Clone project locally
+git clone https://github.com/cuilan/license-key-verify.git
+
+# Use local module in your project
+go mod edit -replace github.com/cuilan/license-key-verify=../path/to/license-key-verify
 go mod tidy
 ```
 
