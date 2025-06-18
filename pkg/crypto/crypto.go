@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"crypto"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -112,7 +113,7 @@ func LoadPublicKeyFromPEM(pemData []byte) (*rsa.PublicKey, error) {
 // SignData 使用私钥对数据进行签名
 func SignData(data []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
 	hash := sha256.Sum256(data)
-	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, 0, hash[:])
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("签名失败: %v", err)
 	}
@@ -122,7 +123,7 @@ func SignData(data []byte, privateKey *rsa.PrivateKey) ([]byte, error) {
 // VerifySignature 使用公钥验证签名
 func VerifySignature(data []byte, signature []byte, publicKey *rsa.PublicKey) error {
 	hash := sha256.Sum256(data)
-	err := rsa.VerifyPKCS1v15(publicKey, 0, hash[:], signature)
+	err := rsa.VerifyPKCS1v15(publicKey, crypto.SHA256, hash[:], signature)
 	if err != nil {
 		return fmt.Errorf("签名验证失败: %v", err)
 	}
