@@ -2,7 +2,7 @@
 
 # 项目信息
 PROJECT_NAME = license-key-verify
-VERSION = 1.0.0
+VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")
 BUILD_TIME = $(shell date +%Y-%m-%d_%H:%M:%S)
 GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -177,7 +177,7 @@ release: build-all
 		if [ -f "README.md" ]; then \
 			cp README.md $(DIST_DIR)/release/$$release_name/; \
 		fi; \
-		(cd $(DIST_DIR)/release && tar -czf $$release_name.tar.gz $$release_name/ && rm -rf $$release_name); \
+		(cd $(DIST_DIR)/release && zip -r $$release_name.zip $$release_name/ && rm -rf $$release_name); \
 	done
 	@echo "发布包已创建到 $(DIST_DIR)/release/ 目录"
 

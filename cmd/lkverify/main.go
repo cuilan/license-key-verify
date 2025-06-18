@@ -8,9 +8,12 @@ import (
 	"github.com/cuilan/license-key-verify/pkg/license"
 )
 
+var (
+	Version = "dev" // 将在构建时通过 -ldflags 设置
+)
+
 const (
-	Version = "1.0.0"
-	Usage   = `lkverify - License Key Verification Tool
+	Usage = `lkverify - License Key Verification Tool
 
 用法:
   lkverify <许可证文件> [选项]

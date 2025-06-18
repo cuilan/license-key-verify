@@ -12,9 +12,12 @@ import (
 	"github.com/cuilan/license-key-verify/pkg/machine"
 )
 
+var (
+	Version = "dev" // 将在构建时通过 -ldflags 设置
+)
+
 const (
-	Version = "1.0.0"
-	Usage   = `lkctl - License Key Control Tool
+	Usage = `lkctl - License Key Control Tool
 
 用法:
   lkctl get <info>           获取机器信息
