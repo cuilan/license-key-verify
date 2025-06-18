@@ -61,18 +61,39 @@ jobs:
           echo "## 首次发布" > CHANGELOG.md
           echo "" >> CHANGELOG.md
           echo "这是项目的首次发布版本。" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "### 功能特性" >> CHANGELOG.md
+          echo "- ✅ 机器信息获取：支持获取MAC地址、系统UUID、CPU ID" >> CHANGELOG.md
+          echo "- ✅ 许可证生成：生成加密的许可证文件，支持机器绑定" >> CHANGELOG.md
+          echo "- ✅ 许可证验证：验证许可证的有效性和机器匹配性" >> CHANGELOG.md
+          echo "- ✅ 数字签名：使用RSA+AES混合加密保证安全性" >> CHANGELOG.md
+          echo "- ✅ 跨平台支持：支持Windows、macOS、Linux" >> CHANGELOG.md
+          echo "- ✅ 命令行工具：提供易用的命令行界面" >> CHANGELOG.md
+          echo "- ✅ SDK集成：可作为库集成到其他项目中" >> CHANGELOG.md
         fi
         
-        # 输出变更日志内容
-        echo "changelog<<EOF" >> $GITHUB_OUTPUT
-        cat CHANGELOG.md >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        # 将变更日志编码为base64，避免特殊字符问题
+        changelog_content=$(base64 -w 0 < CHANGELOG.md)
+        echo "changelog_encoded=${changelog_content}" >> $GITHUB_OUTPUT
+
+    - name: 解码变更日志
+      id: decode_changelog
+      run: |
+        # 解码变更日志
+        echo "${{ steps.changelog.outputs.changelog_encoded }}" | base64 -d > CHANGELOG_DECODED.md
+        
+        # 使用GitHub环境文件设置output
+        {
+          echo 'changelog<<CHANGELOG_EOF'
+          cat CHANGELOG_DECODED.md
+          echo 'CHANGELOG_EOF'
+        } >> $GITHUB_OUTPUT
 
     - name: 创建 GitHub Release
       uses: softprops/action-gh-release@v1
       with:
         name: Release ${{ github.ref_name }}
-        body: ${{ steps.changelog.outputs.changelog }}
+        body: ${{ steps.decode_changelog.outputs.changelog }}
         files: |
           dist/release/*.tar.gz
         draft: false
