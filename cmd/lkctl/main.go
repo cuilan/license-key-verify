@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"license-key-verify/pkg/license"
-	"license-key-verify/pkg/machine"
+	"github.com/cuilan/license-key-verify/pkg/license"
+	"github.com/cuilan/license-key-verify/pkg/machine"
 )
 
 const (

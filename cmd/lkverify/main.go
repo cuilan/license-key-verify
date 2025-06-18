@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"license-key-verify/pkg/license"
+	"github.com/cuilan/license-key-verify/pkg/license"
 )
 
 const (

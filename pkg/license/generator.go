@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/pkg/crypto"
 )
 
 // Generator 许可证生成器

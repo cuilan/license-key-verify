@@ -137,9 +137,39 @@ lkverify <许可证文件> [选项]
   2  参数错误
 ```
 
-## API使用示例
+## 在其他项目中使用
 
-### 作为Go库使用
+### 下载依赖库
+
+```bash
+go get github.com/cuilan/license-key-verify
+```
+
+### 或者使用本地模块（开发时）
+
+```bash
+# 在你的项目中添加本地依赖
+go mod edit -replace license-key-verify=../path/to/license-key-verify
+go mod tidy
+```
+
+### 在Go项目中集成使用
+
+#### 1. 初始化你的Go项目
+
+```bash
+# 创建新项目目录
+mkdir my-licensed-app
+cd my-licensed-app
+
+# 初始化Go模块
+go mod init my-licensed-app
+
+# 下载license-key-verify库
+go get github.com/cuilan/license-key-verify
+```
+
+#### 2. 作为Go库使用
 
 ```go
 package main
@@ -148,8 +178,8 @@ import (
     "fmt"
     "time"
     
-    "license-key-verify/pkg/license"
-    "license-key-verify/pkg/machine"
+    "github.com/cuilan/license-key-verify/pkg/license"
+    "github.com/cuilan/license-key-verify/pkg/machine"
 )
 
 func main() {
@@ -205,6 +235,77 @@ func main() {
         fmt.Printf("许可证验证失败: %s\n", result.Error)
     }
 }
+```
+
+#### 3. 简化的集成示例
+
+创建一个简单的许可证检查函数：
+
+```go
+// license_check.go
+package main
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/cuilan/license-key-verify/pkg/license"
+)
+
+func checkLicense(licenseFile string) bool {
+    // 从默认keys目录加载验证器
+    verifier, err := license.NewVerifierFromFiles("keys/public.pem", "keys/aes.key")
+    if err != nil {
+        fmt.Printf("无法加载密钥文件: %v\n", err)
+        return false
+    }
+    
+    // 验证许可证文件
+    result, err := verifier.VerifyFile(licenseFile)
+    if err != nil {
+        fmt.Printf("验证过程出错: %v\n", err)
+        return false
+    }
+    
+    if result.Valid {
+        fmt.Println("✓ 许可证验证通过")
+        if result.ExpiresIn > 0 {
+            days := result.ExpiresIn / (24 * 3600)
+            fmt.Printf("许可证还有 %d 天到期\n", days)
+        }
+        return true
+    } else {
+        fmt.Printf("✗ 许可证验证失败: %s\n", result.Error)
+        return false
+    }
+}
+
+func main() {
+    if len(os.Args) < 2 {
+        fmt.Println("用法: go run main.go <许可证文件>")
+        os.Exit(1)
+    }
+    
+    licenseFile := os.Args[1]
+    
+    if checkLicense(licenseFile) {
+        fmt.Println("应用程序已授权，正常启动...")
+        // 你的应用程序逻辑
+    } else {
+        fmt.Println("未授权访问，程序退出")
+        os.Exit(1)
+    }
+}
+```
+
+#### 4. 编译和运行
+
+```bash
+# 构建你的应用
+go build -o my-app
+
+# 运行（需要先准备好密钥文件和许可证文件）
+./my-app license.lic
 ```
 
 ## 构建和部署

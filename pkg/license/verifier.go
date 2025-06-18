@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	"license-key-verify/pkg/crypto"
-	"license-key-verify/pkg/machine"
+	"github.com/cuilan/license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/pkg/machine"
 )
 
 // Verifier 许可证验证器

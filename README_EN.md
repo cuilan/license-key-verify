@@ -137,9 +137,39 @@ Exit codes:
   2  Parameter error
 ```
 
-## API Usage Examples
+## Using in Other Projects
 
-### Using as Go Library
+### Download Dependency
+
+```bash
+go get github.com/cuilan/license-key-verify
+```
+
+### Or Use Local Module (for development)
+
+```bash
+# Add local dependency in your project
+go mod edit -replace license-key-verify=../path/to/license-key-verify
+go mod tidy
+```
+
+### Integration in Go Projects
+
+#### 1. Initialize Your Go Project
+
+```bash
+# Create new project directory
+mkdir my-licensed-app
+cd my-licensed-app
+
+# Initialize Go module
+go mod init my-licensed-app
+
+# Download license-key-verify library
+go get github.com/cuilan/license-key-verify
+```
+
+#### 2. Using as Go Library
 
 ```go
 package main
@@ -148,8 +178,8 @@ import (
     "fmt"
     "time"
     
-    "license-key-verify/pkg/license"
-    "license-key-verify/pkg/machine"
+    "github.com/cuilan/license-key-verify/pkg/license"
+    "github.com/cuilan/license-key-verify/pkg/machine"
 )
 
 func main() {
@@ -205,6 +235,77 @@ func main() {
         fmt.Printf("License verification failed: %s\n", result.Error)
     }
 }
+```
+
+#### 3. Simplified Integration Example
+
+Create a simple license check function:
+
+```go
+// license_check.go
+package main
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/cuilan/license-key-verify/pkg/license"
+)
+
+func checkLicense(licenseFile string) bool {
+    // Load verifier from default keys directory
+    verifier, err := license.NewVerifierFromFiles("keys/public.pem", "keys/aes.key")
+    if err != nil {
+        fmt.Printf("Unable to load key files: %v\n", err)
+        return false
+    }
+    
+    // Verify license file
+    result, err := verifier.VerifyFile(licenseFile)
+    if err != nil {
+        fmt.Printf("Verification error: %v\n", err)
+        return false
+    }
+    
+    if result.Valid {
+        fmt.Println("✓ License verification passed")
+        if result.ExpiresIn > 0 {
+            days := result.ExpiresIn / (24 * 3600)
+            fmt.Printf("License expires in %d days\n", days)
+        }
+        return true
+    } else {
+        fmt.Printf("✗ License verification failed: %s\n", result.Error)
+        return false
+    }
+}
+
+func main() {
+    if len(os.Args) < 2 {
+        fmt.Println("Usage: go run main.go <license_file>")
+        os.Exit(1)
+    }
+    
+    licenseFile := os.Args[1]
+    
+    if checkLicense(licenseFile) {
+        fmt.Println("Application authorized, starting normally...")
+        // Your application logic here
+    } else {
+        fmt.Println("Unauthorized access, exiting")
+        os.Exit(1)
+    }
+}
+```
+
+#### 4. Build and Run
+
+```bash
+# Build your application
+go build -o my-app
+
+# Run (requires key files and license file to be ready)
+./my-app license.lic
 ```
 
 ## Build and Deployment
