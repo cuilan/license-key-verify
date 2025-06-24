@@ -54,7 +54,8 @@ func GetSystemUUID() (string, error) {
 			return "", fmt.Errorf("无法获取系统UUID")
 		}
 	case "windows":
-		cmd = exec.Command("wmic", "csproduct", "get", "UUID", "/value")
+		// 使用PowerShell替代已弃用的wmic命令
+		cmd = exec.Command("powershell", "-Command", "Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID")
 	default:
 		return "", fmt.Errorf("不支持的操作系统: %s", runtime.GOOS)
 	}
@@ -82,7 +83,8 @@ func GetCPUID() (string, error) {
 	case "linux":
 		cmd = exec.Command("cat", "/proc/cpuinfo")
 	case "windows":
-		cmd = exec.Command("wmic", "cpu", "get", "ProcessorId", "/value")
+		// 使用PowerShell替代已弃用的wmic命令
+		cmd = exec.Command("powershell", "-Command", "Get-CimInstance -ClassName Win32_Processor | Select-Object -ExpandProperty ProcessorId")
 	default:
 		return "", fmt.Errorf("不支持的操作系统: %s", runtime.GOOS)
 	}
@@ -119,12 +121,11 @@ func parseUUID(output, os string) string {
 	case "linux":
 		return strings.TrimSpace(output)
 	case "windows":
+		// PowerShell输出格式直接返回UUID值
 		for _, line := range lines {
-			if strings.Contains(line, "UUID=") {
-				parts := strings.Split(line, "=")
-				if len(parts) >= 2 {
-					return strings.TrimSpace(parts[1])
-				}
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.Contains(line, "UUID") && !strings.Contains(line, "---") {
+				return line
 			}
 		}
 	}
@@ -145,13 +146,12 @@ func parseCPUID(output, os string) string {
 			}
 		}
 	case "windows":
+		// PowerShell输出格式直接返回ProcessorId值
 		lines := strings.Split(output, "\n")
 		for _, line := range lines {
-			if strings.Contains(line, "ProcessorId=") {
-				parts := strings.Split(line, "=")
-				if len(parts) >= 2 {
-					return strings.TrimSpace(parts[1])
-				}
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.Contains(line, "ProcessorId") && !strings.Contains(line, "---") {
+				return line
 			}
 		}
 	}

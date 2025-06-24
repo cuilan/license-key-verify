@@ -17,6 +17,10 @@ vendor
 bin
 dist
 release
+lkctl
+lkverify
+lkctl.exe
+lkverify.exe
 demo
 vendor
 coverage.html
