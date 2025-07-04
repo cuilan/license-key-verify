@@ -1,52 +1,49 @@
-# 构建阶段
+# --- Build Stage ---
+# Use a specific version for reproducibility and a smaller base
 FROM golang:1.23-alpine AS builder
 
-# 设置工作目录
+# Set working directory
 WORKDIR /app
 
-# 安装必要的工具
-RUN apk add --no-cache git make
-
-# 复制 go mod 文件
+# Copy dependency definition files to leverage Docker's layer caching
 COPY go.mod go.sum ./
 
-# 下载依赖
+# Download dependencies
 RUN go mod download
 
-# 复制源代码
+# Copy the rest of the source code
+# It is recommended to add a .dockerignore file to exclude unnecessary files
 COPY . .
 
-# 构建应用
-RUN make build
+# Build smaller, statically-linked binaries
+# -ldflags "-w -s" strips debug info, reducing binary size
+# CGO_ENABLED=0 helps create static binaries
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /app/bin/lkctl ./cmd/lkctl && \
+    CGO_ENABLED=0 go build -ldflags="-w -s" -o /app/bin/lkverify ./cmd/lkverify
 
-# 运行阶段
-FROM alpine:latest
+# --- Final Stage ---
+# Use a specific, minimal version of Alpine for the final image
+FROM alpine:3.20
 
-# 安装必要的运行时依赖
-RUN apk --no-cache add ca-certificates tzdata
-
-# 设置时区
+# Set timezone
 ENV TZ=Asia/Shanghai
 
-# 创建非 root 用户
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+# Install dependencies and create user in a single RUN instruction to reduce layers
+RUN apk --no-cache add tzdata && \
+    addgroup -S appgroup && \
+    adduser -S appuser -G appgroup
 
-# 设置工作目录
-WORKDIR /app
+# Copy the compiled binaries from the builder stage into a standard location
+COPY --from=builder /app/bin/lkctl /app/bin/lkverify /usr/local/bin/
 
-# 从构建阶段复制二进制文件
-COPY --from=builder /app/bin/lkctl /usr/local/bin/lkctl
-COPY --from=builder /app/bin/lkverify /usr/local/bin/lkverify
-
-# 设置可执行权限
-RUN chmod +x /usr/local/bin/lkctl /usr/local/bin/lkverify
-
-# 切换到非 root 用户
+# Switch to the non-root user
 USER appuser
 
-# 设置入口点
+# Set working directory for the running container
+WORKDIR /app
+
+# Set the entrypoint for the container
 ENTRYPOINT ["lkctl"]
 
-# 默认命令
+# Default command to run when the container starts
 CMD ["--help"] 

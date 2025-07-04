@@ -22,13 +22,13 @@ func NewGenerator() (*Generator, error) {
 	// 生成RSA密钥对
 	keyPair, err := crypto.GenerateKeyPair()
 	if err != nil {
-		return nil, fmt.Errorf("生成密钥对失败: %v", err)
+		return nil, fmt.Errorf("failed to generate key pair: %v", err)
 	}
 
 	// 生成AES密钥
 	aesKey, err := crypto.GenerateAESKey()
 	if err != nil {
-		return nil, fmt.Errorf("生成AES密钥失败: %v", err)
+		return nil, fmt.Errorf("failed to generate AES key: %v", err)
 	}
 
 	return &Generator{
@@ -41,7 +41,7 @@ func NewGenerator() (*Generator, error) {
 func NewGeneratorWithKeys(privateKeyPEM []byte, aesKey []byte) (*Generator, error) {
 	privateKey, err := crypto.LoadPrivateKeyFromPEM(privateKeyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("加载私钥失败: %v", err)
+		return nil, fmt.Errorf("failed to load private key: %v", err)
 	}
 
 	return &Generator{
@@ -53,13 +53,13 @@ func NewGeneratorWithKeys(privateKeyPEM []byte, aesKey []byte) (*Generator, erro
 // Generate 生成许可证
 func (g *Generator) Generate(options *GenerateOptions) (*License, error) {
 	if options == nil {
-		return nil, fmt.Errorf("生成选项不能为空")
+		return nil, fmt.Errorf("generation options cannot be nil")
 	}
 
 	// 生成许可证ID
 	licenseID, err := g.generateLicenseID()
 	if err != nil {
-		return nil, fmt.Errorf("生成许可证ID失败: %v", err)
+		return nil, fmt.Errorf("failed to generate license ID: %v", err)
 	}
 
 	// 设置默认值
@@ -98,19 +98,19 @@ func (g *Generator) SaveToFile(license *License, filePath string) error {
 	// 序列化许可证
 	licenseData, err := json.Marshal(license)
 	if err != nil {
-		return fmt.Errorf("序列化许可证失败: %v", err)
+		return fmt.Errorf("failed to marshal license: %v", err)
 	}
 
 	// 加密许可证数据
 	encryptedData, err := crypto.EncryptAES(licenseData, g.aesKey)
 	if err != nil {
-		return fmt.Errorf("加密许可证数据失败: %v", err)
+		return fmt.Errorf("failed to encrypt license data: %v", err)
 	}
 
 	// 对加密数据进行签名
 	signature, err := crypto.SignData(encryptedData, g.privateKey)
 	if err != nil {
-		return fmt.Errorf("签名失败: %v", err)
+		return fmt.Errorf("failed to sign data: %v", err)
 	}
 
 	// 创建许可证文件
@@ -124,13 +124,13 @@ func (g *Generator) SaveToFile(license *License, filePath string) error {
 	// 序列化许可证文件
 	fileData, err := json.MarshalIndent(licenseFile, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化许可证文件失败: %v", err)
+		return fmt.Errorf("failed to marshal license file: %v", err)
 	}
 
 	// 写入文件
 	err = os.WriteFile(filePath, fileData, 0644)
 	if err != nil {
-		return fmt.Errorf("写入文件失败: %v", err)
+		return fmt.Errorf("failed to write file: %v", err)
 	}
 
 	return nil
@@ -183,30 +183,30 @@ func (g *Generator) SaveKeys(privateKeyPath, publicKeyPath, aesKeyPath string) e
 
 	privateKeyPEM, err := keyPair.PrivateKeyToPEM()
 	if err != nil {
-		return fmt.Errorf("转换私钥失败: %v", err)
+		return fmt.Errorf("failed to convert private key to PEM: %v", err)
 	}
 
 	err = os.WriteFile(privateKeyPath, privateKeyPEM, 0600)
 	if err != nil {
-		return fmt.Errorf("保存私钥失败: %v", err)
+		return fmt.Errorf("failed to save private key: %v", err)
 	}
 
 	// 保存公钥
 	publicKeyPEM, err := keyPair.PublicKeyToPEM()
 	if err != nil {
-		return fmt.Errorf("转换公钥失败: %v", err)
+		return fmt.Errorf("failed to convert public key to PEM: %v", err)
 	}
 
 	err = os.WriteFile(publicKeyPath, publicKeyPEM, 0644)
 	if err != nil {
-		return fmt.Errorf("保存公钥失败: %v", err)
+		return fmt.Errorf("failed to save public key: %v", err)
 	}
 
 	// 保存AES密钥
 	aesKeyEncoded := crypto.EncodeBase64(g.aesKey)
 	err = os.WriteFile(aesKeyPath, []byte(aesKeyEncoded), 0600)
 	if err != nil {
-		return fmt.Errorf("保存AES密钥失败: %v", err)
+		return fmt.Errorf("failed to save AES key: %v", err)
 	}
 
 	return nil

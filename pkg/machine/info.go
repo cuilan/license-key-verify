@@ -21,7 +21,7 @@ type MachineInfo struct {
 func GetMACAddress() (string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return "", fmt.Errorf("获取网络接口失败: %v", err)
+		return "", fmt.Errorf("failed to get network interfaces: %v", err)
 	}
 
 	for _, iface := range interfaces {
@@ -34,7 +34,7 @@ func GetMACAddress() (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("未找到有效的MAC地址")
+	return "", fmt.Errorf("no valid MAC address found")
 }
 
 // GetSystemUUID 获取系统UUID
@@ -51,23 +51,23 @@ func GetSystemUUID() (string, error) {
 		} else if _, err := os.Stat("/proc/sys/kernel/random/uuid"); err == nil {
 			cmd = exec.Command("cat", "/proc/sys/kernel/random/uuid")
 		} else {
-			return "", fmt.Errorf("无法获取系统UUID")
+			return "", fmt.Errorf("failed to get system UUID")
 		}
 	case "windows":
 		// 使用PowerShell替代已弃用的wmic命令
 		cmd = exec.Command("powershell", "-Command", "Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID")
 	default:
-		return "", fmt.Errorf("不支持的操作系统: %s", runtime.GOOS)
+		return "", fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("执行命令失败: %v", err)
+		return "", fmt.Errorf("failed to execute command: %v", err)
 	}
 
 	uuid := parseUUID(string(output), runtime.GOOS)
 	if uuid == "" {
-		return "", fmt.Errorf("无法解析UUID")
+		return "", fmt.Errorf("failed to parse UUID")
 	}
 
 	return uuid, nil
@@ -86,17 +86,17 @@ func GetCPUID() (string, error) {
 		// 使用PowerShell替代已弃用的wmic命令
 		cmd = exec.Command("powershell", "-Command", "Get-CimInstance -ClassName Win32_Processor | Select-Object -ExpandProperty ProcessorId")
 	default:
-		return "", fmt.Errorf("不支持的操作系统: %s", runtime.GOOS)
+		return "", fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("执行命令失败: %v", err)
+		return "", fmt.Errorf("failed to execute command: %v", err)
 	}
 
 	cpuid := parseCPUID(string(output), runtime.GOOS)
 	if cpuid == "" {
-		return "", fmt.Errorf("无法解析CPU ID")
+		return "", fmt.Errorf("failed to parse CPU ID")
 	}
 
 	// 生成CPU ID的MD5哈希值作为唯一标识
