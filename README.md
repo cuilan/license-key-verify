@@ -323,6 +323,88 @@ go build -o my-app
 ./my-app license.lic
 ```
 
+### 安全集成模式 (推荐)
+
+前面的示例为了简洁，演示了从外部文件 (`keys/public.pem`, `keys/aes.key`) 加载密钥。但这种方式存在安全风险：**如果您的客户能够替换这些密钥文件，他们就可以使用 `lkctl` 工具自行签发有效的许可证**。
+
+为了彻底杜绝这种风险，强烈建议您将 **公钥** 和 **AES密钥** 的内容直接硬编码到您的应用程序中。这样，您的程序将只信任您编译进去的密钥，任何外部密钥都无法通过验证。
+
+下面是一个更安全的集成示例 (`examples/secure-integration/main.go`)：
+
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	
+	"github.com/cuilan/license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/pkg/license"
+)
+
+// =================================================================
+// 关键安全区：将您的公钥和AES密钥内容作为常量嵌入到代码中
+// =================================================================
+
+const (
+	// publicKeyPEM 应该包含 '-----BEGIN PUBLIC KEY-----' 和 '-----END PUBLIC KEY-----' 的完整内容。
+	// !!! 这是一个示例公钥，请务必替换为您自己的公钥。!!!
+	publicKeyPEM = `
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqP4C3nN5Z5vB74rVb5q1
+... (your public key content here) ...
+-----END PUBLIC KEY-----
+`
+
+	// aesKeyBase64 应该是从您生成的 aes.key 文件中复制的 Base64 编码字符串。
+	// !!! 这是一个示例AES密钥，请务必替换为您自己的主AES密钥。!!!
+	aesKeyBase64 = `YOUR_BASE64_ENCODED_AES_KEY_HERE`
+)
+
+// createVerifierFromEmbeddedKeys 从硬编码的密钥创建一个安全的验证器实例。
+func createVerifierFromEmbeddedKeys() (*license.Verifier, error) {
+	// 1. 从Base64字符串解码AES密钥
+	aesKey, err := crypto.DecodeBase64(aesKeyBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode embedded AES key: %w", err)
+	}
+
+	// 2. 使用加载好的密钥创建验证器实例
+	return license.NewVerifier([]byte(publicKeyPEM), aesKey)
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Printf("Usage: %s <path-to-license.lic>\n", os.Args[0])
+		os.Exit(1)
+	}
+	licenseFile := os.Args[1]
+
+	// 初始化一个只信任内嵌密钥的安全验证器
+	verifier, err := createVerifierFromEmbeddedKeys()
+	if err != nil {
+		fmt.Printf("FATAL: Could not initialize license verifier: %v\n", err)
+		os.Exit(1)
+	}
+
+	// 使用这个安全的验证器来校验许可证文件
+	result, err := verifier.VerifyFile(licenseFile)
+	if err != nil {
+		fmt.Printf("License verification failed with an error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if result.Valid {
+		fmt.Println("✅ License is VALID.")
+		// 在这里运行您的应用程序核心逻辑...
+	} else {
+		fmt.Printf("❌ License is INVALID: %s\n", result.Error)
+		os.Exit(1)
+	}
+}
+```
+
+
 ## 构建和部署
 
 ### 本地构建

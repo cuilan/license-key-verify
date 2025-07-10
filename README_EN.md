@@ -281,64 +281,84 @@ func main() {
 }
 ```
 
-#### 3. Simplified Integration Example
+### Secure Integration Mode (Recommended)
 
-Create a simple license check function:
+The previous examples demonstrated loading keys from external files (`keys/public.pem`, `keys/aes.key`) for simplicity. However, this approach carries a security risk: **if your customers can replace these key files, they can use the `lkctl` tool to issue valid licenses for themselves**.
+
+To completely eliminate this risk, it is strongly recommended to **hard-code the public key and AES key contents directly into your application**. This way, your program will only trust the keys you compiled into it, and no external keys can pass verification.
+
+Here is a more secure integration example (`examples/secure-integration/main.go`):
 
 ```go
-// license_check.go
 package main
 
 import (
-    "fmt"
-    "os"
-    
-    "github.com/cuilan/license-key-verify/pkg/license"
+	"fmt"
+	"os"
+	
+	"github.com/cuilan/license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/pkg/license"
 )
 
-func checkLicense(licenseFile string) bool {
-    // Load verifier from default keys directory
-    verifier, err := license.NewVerifierFromFiles("keys/public.pem", "keys/aes.key")
-    if err != nil {
-        fmt.Printf("Unable to load key files: %v\n", err)
-        return false
-    }
-    
-    // Verify license file
-    result, err := verifier.VerifyFile(licenseFile)
-    if err != nil {
-        fmt.Printf("Verification error: %v\n", err)
-        return false
-    }
-    
-    if result.Valid {
-        fmt.Println("✓ License verification passed")
-        if result.ExpiresIn > 0 {
-            days := result.ExpiresIn / (24 * 3600)
-            fmt.Printf("License expires in %d days\n", days)
-        }
-        return true
-    } else {
-        fmt.Printf("✗ License verification failed: %s\n", result.Error)
-        return false
-    }
+// =================================================================
+// Critical Security Zone: Embed your public key and AES key as constants.
+// =================================================================
+
+const (
+	// publicKeyPEM should contain the full content of '-----BEGIN PUBLIC KEY-----' and '-----END PUBLIC KEY-----'.
+	// !!! This is an example key. Be sure to replace it with your own public key. !!!
+	publicKeyPEM = `
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqP4C3nN5Z5vB74rVb5q1
+... (your public key content here) ...
+-----END PUBLIC KEY-----
+`
+
+	// aesKeyBase64 should be the Base64 encoded string from your aes.key file.
+	// !!! This is an example key. Be sure to replace it with your own AES key. !!!
+	aesKeyBase64 = `YOUR_BASE64_ENCODED_AES_KEY_HERE`
+)
+
+// createVerifierFromEmbeddedKeys creates a secure verifier instance from hard-coded keys.
+func createVerifierFromEmbeddedKeys() (*license.Verifier, error) {
+	// 1. Decode the AES key from the Base64 string.
+	aesKey, err := crypto.DecodeBase64(aesKeyBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode embedded AES key: %w", err)
+	}
+
+	// 2. Create the verifier instance using the loaded keys.
+	return license.NewVerifier([]byte(publicKeyPEM), aesKey)
 }
 
 func main() {
-    if len(os.Args) < 2 {
-        fmt.Println("Usage: go run main.go <license_file>")
-        os.Exit(1)
-    }
-    
-    licenseFile := os.Args[1]
-    
-    if checkLicense(licenseFile) {
-        fmt.Println("Application authorized, starting normally...")
-        // Your application logic here
-    } else {
-        fmt.Println("Unauthorized access, exiting")
-        os.Exit(1)
-    }
+	if len(os.Args) < 2 {
+		fmt.Printf("Usage: %s <path-to-license.lic>\n", os.Args[0])
+		os.Exit(1)
+	}
+	licenseFile := os.Args[1]
+
+	// Initialize a secure verifier that only trusts the embedded keys.
+	verifier, err := createVerifierFromEmbeddedKeys()
+	if err != nil {
+		fmt.Printf("FATAL: Could not initialize license verifier: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Verify the license file using the secure verifier.
+	result, err := verifier.VerifyFile(licenseFile)
+	if err != nil {
+		fmt.Printf("License verification failed with an error: %v\n", err)
+		os.Exit(1)
+	}
+
+	if result.Valid {
+		fmt.Println("✅ License is VALID.")
+		// Your core application logic goes here...
+	} else {
+		fmt.Printf("❌ License is INVALID: %s\n", result.Error)
+		os.Exit(1)
+	}
 }
 ```
 
