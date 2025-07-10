@@ -28,3 +28,4 @@ coverage.out
 *.lic
 *.key
 *.pem
+test_run

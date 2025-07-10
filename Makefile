@@ -24,10 +24,10 @@ BIN_DIR = bin
 # 目标平台
 PLATFORMS = darwin/amd64,darwin/arm64,linux/amd64,linux/arm64,windows/amd64
 
-.PHONY: all build build-all clean test deps help install uninstall release
+.PHONY: all build build-all clean test test-e2e deps help install uninstall release
 
 # 默认目标
-all: clean deps test build
+all: clean deps test build test-e2e
 
 # 构建当前平台的二进制文件
 build:
@@ -86,12 +86,21 @@ clean:
 	@rm -rf $(DIST_DIR)
 	@rm -rf keys/
 	@rm -f *.lic
+	@rm -rf demo/
+	@rm -rf tests/test_run/
+	@rm -f coverage.out coverage.html
 	@echo "清理完成!"
 
-# 运行测试
+# 运行单元测试
 test:
-	@echo "运行测试..."
+	@echo "运行单元测试..."
 	@$(GOTEST) -v ./...
+
+# 运行端到端测试
+test-e2e: build
+	@echo "运行端到端测试..."
+	@chmod +x tests/e2e_test.sh
+	@./tests/e2e_test.sh
 
 # 运行测试并生成覆盖率报告
 test-coverage:
@@ -120,8 +129,9 @@ lint:
 demo: build
 	@echo "生成示例..."
 	@mkdir -p demo
-	@./$(BIN_DIR)/lkctl keys --output demo
+	@# lkctl gen 会自动在 demo/ 目录中创建密钥文件
 	@./$(BIN_DIR)/lkctl gen \
+		--keys-dir demo \
 		--mac $(shell ./$(BIN_DIR)/lkctl get mac) \
 		--uuid $(shell ./$(BIN_DIR)/lkctl get uuid) \
 		--cpuid $(shell ./$(BIN_DIR)/lkctl get cpuid) \
@@ -192,7 +202,8 @@ help:
 	@echo "  install      - 安装到系统路径"
 	@echo "  uninstall    - 从系统路径卸载"
 	@echo "  clean        - 清理构建文件"
-	@echo "  test         - 运行测试"
+	@echo "  test         - 运行单元测试"
+	@echo "  test-e2e     - 运行端到端测试"
 	@echo "  test-coverage- 运行测试并生成覆盖率报告"
 	@echo "  deps         - 下载依赖"
 	@echo "  fmt          - 格式化代码"

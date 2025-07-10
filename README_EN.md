@@ -42,17 +42,19 @@ lkctl get mac
 lkctl get uuid
 
 # Get CPU ID
-./bin/lkctl get cpuid
+lkctl get cpuid
+
+# Get all machine information
+lkctl get all
 ```
 
 ### 3. Generate License
 
 ```bash
-# Generate key pair
-./bin/lkctl keys --output keys
-
-# Generate license
-./bin/lkctl gen \
+# Generate a license. If key files do not exist, they will be automatically
+# generated and saved to the directory specified by --keys-dir (default: keys/)
+lkctl gen \
+  --keys-dir ./mykeys \
   --mac "00:11:22:33:44:55" \
   --uuid "12345678-1234-1234-1234-123456789012" \
   --cpuid "abcdef1234567890" \
@@ -60,19 +62,26 @@ lkctl get uuid
   --product "Example Product" \
   --duration 365 \
   license.lic
+
+# Generate a license using existing keys
+lkctl gen \
+  --private-key ./mykeys/private.pem \
+  --aes-key ./mykeys/aes.key \
+  --customer "Another Customer" \
+  license2.lic
 ```
 
 ### 4. Verify License
 
 ```bash
 # Verify using lkctl
-./bin/lkctl verify license.lic
+lkctl verify license.lic
 
 # Verify using lkverify
-./bin/lkverify license.lic
+lkverify license.lic
 
 # JSON output
-./bin/lkverify license.lic --json
+lkverify license.lic --json
 ```
 
 ## Command Line Tools
@@ -87,6 +96,7 @@ lkctl get uuid
 lkctl get mac     # Get MAC address
 lkctl get uuid    # Get system UUID
 lkctl get cpuid   # Get CPU ID
+lkctl get all     # Get all machine information
 ```
 
 #### Generate Key Pair
@@ -94,6 +104,7 @@ lkctl get cpuid   # Get CPU ID
 ```bash
 lkctl keys --output <directory>
 ```
+> **Note**: The `lkctl gen` command also generates keys automatically if they are not provided. The `keys` command is useful when you only need to generate key files.
 
 #### Generate License
 
@@ -110,6 +121,9 @@ Options:
   --version <version>      Product version
   --features <list>        Feature list (comma-separated)
   --max-users <number>     Maximum number of users
+  --keys-dir <dir>         Directory to save new keys (default: keys)
+  --private-key <file>     Path to the private key file for signing. If not provided, a new one is generated.
+  --aes-key <file>         Path to the AES key file for encryption. If not provided, a new one is generated.
 ```
 
 #### Verify License
@@ -128,6 +142,8 @@ lkverify <license_file> [options]
 
 Options:
   --keys-dir <directory>   Specify key file directory (default: keys)
+  --public-key <file>      Path to the public key file (overrides --keys-dir)
+  --aes-key <file>         Path to the AES key file (overrides --keys-dir)
   --json                   Output results in JSON format
   --quiet                  Quiet mode, only output exit code
 
@@ -463,7 +479,7 @@ A: No. License files contain machine binding information and verification will f
 
 ### Q: How to backup and restore keys?
 
-A: Key files are saved in the `keys/` directory. It's recommended to backup the entire directory. Private keys are used for license generation, public keys and AES keys are used for verification.
+A: When using `lkctl gen`, you can specify the directory for new keys with the `--keys-dir` argument (defaults to `keys/`). It's recommended to backup this entire directory. Private keys are used for license generation; public keys and AES keys are used for verification. Keep your private key secure.
 
 ### Q: Does it support offline verification?
 

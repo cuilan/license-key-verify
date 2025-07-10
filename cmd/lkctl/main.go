@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cuilan/license-key-verify/pkg/crypto"
 	"github.com/cuilan/license-key-verify/pkg/license"
 	"github.com/cuilan/license-key-verify/pkg/machine"
 )
@@ -33,6 +34,7 @@ const (
     lkctl get mac               Get MAC address
     lkctl get uuid              Get system UUID
     lkctl get cpuid             Get CPU ID
+    lkctl get all               Get all machine information
 
   lkctl gen [options] <output-file> Generate a license
     --mac <mac>                 Specify MAC address
@@ -44,6 +46,9 @@ const (
     --version <version>         Product version
     --features <list>           Comma-separated list of features
     --max-users <count>         Maximum number of users
+    --keys-dir <dir>            Directory for key files (default: keys)
+    --private-key <file>        Path to private key file. If not provided, a new one is generated.
+    --aes-key <file>            Path to AES key file. If not provided, a new one is generated.
 
   lkctl verify <license-file>   Verify a license
   lkctl info <license-file>     Show license information
@@ -88,7 +93,7 @@ func main() {
 
 func handleGet() {
 	if len(os.Args) < 3 {
-		fmt.Println("Usage: lkctl get <mac|uuid|cpuid>")
+		fmt.Println("Usage: lkctl get <mac|uuid|cpuid|all>")
 		os.Exit(1)
 	}
 
@@ -119,9 +124,31 @@ func handleGet() {
 		}
 		fmt.Println(cpuid)
 
+	case "all":
+		mac, err := machine.GetMACAddress()
+		if err != nil {
+			fmt.Printf("MAC: <error: %v>\n", err)
+		} else {
+			fmt.Printf("MAC: %s\n", mac)
+		}
+
+		uuid, err := machine.GetSystemUUID()
+		if err != nil {
+			fmt.Printf("UUID: <error: %v>\n", err)
+		} else {
+			fmt.Printf("UUID: %s\n", uuid)
+		}
+
+		cpuid, err := machine.GetCPUID()
+		if err != nil {
+			fmt.Printf("CPUID: <error: %v>\n", err)
+		} else {
+			fmt.Printf("CPUID: %s\n", cpuid)
+		}
+
 	default:
 		fmt.Printf("Unknown info type: %s\n", infoType)
-		fmt.Println("Supported types: mac, uuid, cpuid")
+		fmt.Println("Supported types: mac, uuid, cpuid, all")
 		os.Exit(1)
 	}
 }
@@ -139,6 +166,9 @@ func handleGen() {
 		version  = fs.String("version", "", "Product version")
 		features = fs.String("features", "", "Comma-separated list of features")
 		maxUsers = fs.Int("max-users", 0, "Maximum number of users")
+		keysDir  = fs.String("keys-dir", "keys", "Directory to save newly generated key files")
+		privKey  = fs.String("private-key", "", "Path to private key file. If not provided, a new one is generated.")
+		aesKey   = fs.String("aes-key", "", "Path to AES key file. If not provided, a new one is generated.")
 	)
 
 	fs.Parse(os.Args[2:])
@@ -151,10 +181,60 @@ func handleGen() {
 
 	outputFile := args[0]
 
-	// Create generator
-	generator, err := license.NewGenerator()
+	var (
+		generator        *license.Generator
+		privateKeyPEM    []byte
+		aesKeyBytes      []byte
+		err              error
+		generatedPrivKey bool
+		generatedAesKey  bool
+	)
+
+	// Handle private key
+	if *privKey != "" {
+		privateKeyPEM, err = os.ReadFile(*privKey)
+		if err != nil {
+			fmt.Printf("Failed to read private key: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		keyPair, err := crypto.GenerateKeyPair()
+		if err != nil {
+			fmt.Printf("Failed to generate key pair: %v\n", err)
+			os.Exit(1)
+		}
+		privateKeyPEM, err = keyPair.PrivateKeyToPEM()
+		if err != nil {
+			fmt.Printf("Failed to convert private key to PEM: %v\n", err)
+			os.Exit(1)
+		}
+		generatedPrivKey = true
+	}
+
+	// Handle AES key
+	if *aesKey != "" {
+		aesKeyFileBytes, err := os.ReadFile(*aesKey)
+		if err != nil {
+			fmt.Printf("Failed to read AES key file: %v\n", err)
+			os.Exit(1)
+		}
+		aesKeyBytes, err = crypto.DecodeBase64(string(aesKeyFileBytes))
+		if err != nil {
+			fmt.Printf("Failed to decode AES key: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		aesKeyBytes, err = crypto.GenerateAESKey()
+		if err != nil {
+			fmt.Printf("Failed to generate AES key: %v\n", err)
+			os.Exit(1)
+		}
+		generatedAesKey = true
+	}
+
+	generator, err = license.NewGeneratorWithKeys(privateKeyPEM, aesKeyBytes)
 	if err != nil {
-		fmt.Printf("Failed to create generator: %v\n", err)
+		fmt.Printf("Failed to create generator with keys: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -188,22 +268,47 @@ func handleGen() {
 		os.Exit(1)
 	}
 
-	// Save key files
-	keyDir := "keys"
-	os.MkdirAll(keyDir, 0755)
+	fmt.Printf("License generated: %s\n", outputFile)
 
-	err = generator.SaveKeys(
-		keyDir+"/private.pem",
-		keyDir+"/public.pem",
-		keyDir+"/aes.key",
-	)
-	if err != nil {
-		fmt.Printf("Failed to save keys: %v\n", err)
-		os.Exit(1)
+	if generatedPrivKey || generatedAesKey {
+		os.MkdirAll(*keysDir, 0755)
+
+		if generatedPrivKey {
+			// Save private key
+			privKeyPath := *keysDir + "/private.pem"
+			err = os.WriteFile(privKeyPath, privateKeyPEM, 0600)
+			if err != nil {
+				fmt.Printf("Failed to save private key: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Save public key
+			pubKeyPEM, err := generator.GetPublicKeyPEM()
+			if err != nil {
+				fmt.Printf("Failed to get public key PEM: %v\n", err)
+				os.Exit(1)
+			}
+			pubKeyPath := *keysDir + "/public.pem"
+			err = os.WriteFile(pubKeyPath, pubKeyPEM, 0644)
+			if err != nil {
+				fmt.Printf("Failed to save public key: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("New RSA key pair saved to %s and %s\n", privKeyPath, pubKeyPath)
+		}
+
+		if generatedAesKey {
+			aesKeyPath := *keysDir + "/aes.key"
+			encodedKey := crypto.EncodeBase64(aesKeyBytes)
+			err = os.WriteFile(aesKeyPath, []byte(encodedKey), 0600)
+			if err != nil {
+				fmt.Printf("Failed to save AES key: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Printf("New AES key saved to %s\n", aesKeyPath)
+		}
 	}
 
-	fmt.Printf("License generated: %s\n", outputFile)
-	fmt.Printf("Keys saved to: %s/\n", keyDir)
 	fmt.Printf("License ID: %s\n", lic.ID)
 	fmt.Printf("Expires at: %s\n", lic.ExpiresAt.Format("2006-01-02 15:04:05"))
 }
