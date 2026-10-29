@@ -1,166 +1,132 @@
 # License Key Verify Tool Makefile
 
-# 项目信息
+# Project info (falls back to 0.0.0 when no tag exists)
 PROJECT_NAME = license-key-verify
-VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0")
+VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
 BUILD_TIME = $(shell date +%Y-%m-%d_%H:%M:%S)
 GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+ifeq ($(strip $(VERSION)),)
+VERSION := 0.0.0
+endif
 
-# Go 参数
+# Go commands
 GOCMD = go
 GOBUILD = $(GOCMD) build
 GOCLEAN = $(GOCMD) clean
 GOTEST = $(GOCMD) test
-GOGET = $(GOCMD) get
 GOMOD = $(GOCMD) mod
 
-# 构建参数
+# Build flags
 LDFLAGS = -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
 
-# 输出目录
+# Output directories
 DIST_DIR = dist
 BIN_DIR = bin
 
-# 目标平台
+# Target platforms
 PLATFORMS = darwin/amd64,darwin/arm64,linux/amd64,linux/arm64,windows/amd64
 
-.PHONY: all build build-all clean test test-e2e deps help install uninstall release
+# Host executable suffix. Windows hosts (incl. Git Bash) get .exe, but WSL must be
+# excluded: it inherits the OS=Windows_NT env var from Windows while uname says Linux.
+UNAME_S := $(shell uname -s 2>/dev/null || echo Unknown)
+ifneq ($(and $(filter Windows_NT,$(OS)),$(filter-out Linux,$(UNAME_S))),)
+HOST_EXE := .exe
+endif
 
-# 默认目标
-all: clean deps test build test-e2e
+.PHONY: all build build-all clean test test-e2e test-coverage deps fmt lint help release
 
-# 构建当前平台的二进制文件
+# Default target (test-e2e depends on build, avoiding a double build)
+all: clean deps test test-e2e
+
+# Build the binary for the current platform
 build:
-	@echo "构建 lkctl..."
+	@echo "Building lkctl..."
 	@mkdir -p $(BIN_DIR)
-	$(GOBUILD) $(LDFLAGS) -o $(BIN_DIR)/lkctl ./cmd/lkctl
-	@echo "构建完成!"
+	$(GOBUILD) $(LDFLAGS) -o $(BIN_DIR)/lkctl$(HOST_EXE) ./cmd/lkctl
+	@echo "Build complete: $(BIN_DIR)/lkctl$(HOST_EXE)"
 
-# 构建所有平台的二进制文件
+# Build binaries for all platforms
 build-all:
-	@echo "构建所有平台的二进制文件..."
+	@echo "Building for all platforms..."
 	@mkdir -p $(DIST_DIR)
 	@for platform in $(shell echo $(PLATFORMS) | tr ',' ' '); do \
 		os=$$(echo $$platform | cut -d'/' -f1); \
 		arch=$$(echo $$platform | cut -d'/' -f2); \
-		echo "构建 $$os/$$arch..."; \
+		echo "Building $$os/$$arch..."; \
 		if [ "$$os" = "windows" ]; then \
 			GOOS=$$os GOARCH=$$arch $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/lkctl_$${os}_$${arch}.exe ./cmd/lkctl; \
 		else \
 			GOOS=$$os GOARCH=$$arch $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/lkctl_$${os}_$${arch} ./cmd/lkctl; \
 		fi; \
 	done
-	@echo "所有平台构建完成!"
+	@echo "All platforms built!"
 
-# 安装到系统路径
-install: build
-	@echo "安装到系统路径..."
-	@if [ "$(shell id -u)" -ne 0 ]; then \
-		echo "错误: 需要 root 权限来安装"; \
-		exit 1; \
-	fi
-	@cp $(BIN_DIR)/lkctl /usr/local/bin/
-	@echo "安装完成!"
-
-# 从系统路径卸载
-uninstall:
-	@echo "从系统路径卸载..."
-	@if [ "$(shell id -u)" -ne 0 ]; then \
-		echo "错误: 需要 root 权限来卸载"; \
-		exit 1; \
-	fi
-	@rm -f /usr/local/bin/lkctl
-	@echo "卸载完成!"
-
-# 清理构建文件
+# Remove build artifacts (never touches keys/ or *.lic -- those are user assets)
 clean:
-	@echo "清理构建文件..."
-	@$(GOCLEAN)
+	@echo "Cleaning build artifacts..."
+	-@$(GOCLEAN)
 	@rm -rf $(BIN_DIR)
 	@rm -rf $(DIST_DIR)
-	@rm -rf keys/
-	@rm -f *.lic
-	@rm -rf demo/
 	@rm -rf tests/test_run/
 	@rm -f coverage.out coverage.html
-	@echo "清理完成!"
+	@echo "Clean complete!"
 
-# 运行单元测试
+# Run unit tests
 test:
-	@echo "运行单元测试..."
+	@echo "Running unit tests..."
 	@$(GOTEST) -v ./...
 
-# 运行端到端测试
+# Run end-to-end tests
 test-e2e: build
-	@echo "运行端到端测试..."
+	@echo "Running end-to-end tests..."
 	@chmod +x tests/e2e_test.sh
 	@./tests/e2e_test.sh
 
-# 运行测试并生成覆盖率报告
+# Run tests and generate a coverage report
 test-coverage:
-	@echo "运行测试并生成覆盖率报告..."
+	@echo "Running tests with coverage..."
 	@$(GOTEST) -v -coverprofile=coverage.out ./...
 	@$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "覆盖率报告已生成: coverage.html"
+	@echo "Coverage report generated: coverage.html"
 
-# 下载依赖
+# Download dependencies
 deps:
-	@echo "下载依赖..."
+	@echo "Downloading dependencies..."
 	@$(GOMOD) download
 	@$(GOMOD) tidy
 
-# 格式化代码
+# Format code
 fmt:
-	@echo "格式化代码..."
+	@echo "Formatting code..."
 	@$(GOCMD) fmt ./...
 
-# 代码检查
+# Lint code
 lint:
-	@echo "代码检查..."
+	@echo "Linting code..."
 	@golangci-lint run ./...
 
-# 生成示例密钥和许可证
-demo: build
-	@echo "生成示例..."
-	@mkdir -p demo
-	@# 使用演示私钥签发（与 pkg/license/key.go 内嵌公钥配对）
-	@./$(BIN_DIR)/lkctl sign \
-		--private-key testdata/private.pem \
-		--fingerprint $$(./$(BIN_DIR)/lkctl fingerprint) \
-		--customer "示例客户" \
-		--product "示例产品" \
-		--features "feature1,feature2" \
-		--duration 30 \
-		--out demo/license.lic
-	@echo "示例文件已生成到 demo/ 目录"
-
-# 验证示例许可证
-verify-demo: demo
-	@echo "验证示例许可证..."
-	@./$(BIN_DIR)/lkctl verify demo/license.lic
-
-# 创建发布包
+# Create release packages
 release: build-all
-	@echo "创建发布包..."
+	@echo "Creating release packages..."
 	@mkdir -p $(DIST_DIR)/release
 	@for platform in $(shell echo $(PLATFORMS) | tr ',' ' '); do \
 		os=$$(echo $$platform | cut -d'/' -f1); \
 		arch=$$(echo $$platform | cut -d'/' -f2); \
 		release_name="$(PROJECT_NAME)_$(VERSION)_$${os}_$${arch}"; \
-		echo "打包 $$release_name..."; \
+		echo "Packaging $$release_name..."; \
 		mkdir -p $(DIST_DIR)/release/$$release_name; \
 		if [ "$$os" = "windows" ]; then \
 			if [ -f "$(DIST_DIR)/lkctl_$${os}_$${arch}.exe" ]; then \
 				cp $(DIST_DIR)/lkctl_$${os}_$${arch}.exe $(DIST_DIR)/release/$$release_name/lkctl.exe; \
 			else \
-				echo "警告: $(DIST_DIR)/lkctl_$${os}_$${arch}.exe 不存在"; \
+				echo "Warning: $(DIST_DIR)/lkctl_$${os}_$${arch}.exe not found"; \
 			fi; \
 		else \
 			if [ -f "$(DIST_DIR)/lkctl_$${os}_$${arch}" ]; then \
 				cp $(DIST_DIR)/lkctl_$${os}_$${arch} $(DIST_DIR)/release/$$release_name/lkctl; \
 				chmod +x $(DIST_DIR)/release/$$release_name/lkctl; \
 			else \
-				echo "警告: $(DIST_DIR)/lkctl_$${os}_$${arch} 不存在"; \
+				echo "Warning: $(DIST_DIR)/lkctl_$${os}_$${arch} not found"; \
 			fi; \
 		fi; \
 		if [ -f "README.md" ]; then \
@@ -168,32 +134,28 @@ release: build-all
 		fi; \
 		(cd $(DIST_DIR)/release && zip -r $$release_name.zip $$release_name/ && rm -rf $$release_name); \
 	done
-	@echo "发布包已创建到 $(DIST_DIR)/release/ 目录"
+	@echo "Release packages created in $(DIST_DIR)/release/"
 
-# 显示帮助信息
+# Show help
 help:
-	@echo "License Key Verify Tool - 构建帮助"
+	@echo "License Key Verify Tool - build targets"
 	@echo ""
-	@echo "可用目标:"
-	@echo "  all          - 清理、下载依赖、测试、构建（默认）"
-	@echo "  build        - 构建当前平台的二进制文件"
-	@echo "  build-all    - 构建所有平台的二进制文件"
-	@echo "  install      - 安装到系统路径"
-	@echo "  uninstall    - 从系统路径卸载"
-	@echo "  clean        - 清理构建文件"
-	@echo "  test         - 运行单元测试"
-	@echo "  test-e2e     - 运行端到端测试"
-	@echo "  test-coverage- 运行测试并生成覆盖率报告"
-	@echo "  deps         - 下载依赖"
-	@echo "  fmt          - 格式化代码"
-	@echo "  lint         - 代码检查"
-	@echo "  demo         - 生成示例密钥和许可证"
-	@echo "  verify-demo  - 验证示例许可证"
-	@echo "  release      - 创建发布包"
-	@echo "  help         - 显示此帮助信息"
+	@echo "Available targets:"
+	@echo "  all           - clean, deps, test, e2e (default)"
+	@echo "  build         - build the binary for the current platform"
+	@echo "  build-all     - build binaries for all platforms"
+	@echo "  clean         - remove build artifacts"
+	@echo "  test          - run unit tests"
+	@echo "  test-e2e      - run end-to-end tests"
+	@echo "  test-coverage - run tests and generate a coverage report"
+	@echo "  deps          - download dependencies"
+	@echo "  fmt           - format code"
+	@echo "  lint          - lint code"
+	@echo "  release       - create release packages"
+	@echo "  help          - show this help"
 	@echo ""
-	@echo "项目信息:"
-	@echo "  项目名称: $(PROJECT_NAME)"
-	@echo "  版本: $(VERSION)"
-	@echo "  构建时间: $(BUILD_TIME)"
-	@echo "  Git提交: $(GIT_COMMIT)" 
+	@echo "Project info:"
+	@echo "  project: $(PROJECT_NAME)"
+	@echo "  version: $(VERSION)"
+	@echo "  built:   $(BUILD_TIME)"
+	@echo "  commit:  $(GIT_COMMIT)"

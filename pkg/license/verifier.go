@@ -42,6 +42,22 @@ func currentKey() (*rsa.PublicKey, error) {
 	return globalKey, nil
 }
 
+// HasEmbeddedKey 返回当前二进制是否内嵌了可用公钥。
+// fork 本仓库后未执行 lkctl embed 时为 false，验证与签发防呆检查都会失败。
+func HasEmbeddedKey() bool {
+	key, err := currentKey()
+	return err == nil && key != nil
+}
+
+// EmbeddedKeyPEM 返回内嵌公钥的 PEM 编码（未内嵌时返回错误）。
+func EmbeddedKeyPEM() ([]byte, error) {
+	key, err := currentKey()
+	if err != nil {
+		return nil, err
+	}
+	return crypto.PublicKeyToPEM(key)
+}
+
 // VerifyFile 验证许可证文件（使用内置公钥）。
 func VerifyFile(path string) Result {
 	data, err := os.ReadFile(path)

@@ -1,4 +1,4 @@
-# License Key Verify Tool
+﻿# License Key Verify Tool
 
 [![CI](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml)
 [![Release](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml)
@@ -23,7 +23,7 @@
 ### 1. 构建
 
 ```bash
-make build   # 产出 bin/lkctl
+make build   # 产出 bin/lkctl（Windows 为 bin/lkctl.exe）
 ```
 
 ### 2. 生成密钥对（你本地）
@@ -47,6 +47,8 @@ lkctl fingerprint
 
 ### 4. 签发许可证（你本地）
 
+`sign` 只需私钥即可完成，与 `embed` 无关——lkctl 是通用工具，无需重新编译：
+
 ```bash
 lkctl sign \
   --private-key keys/private.pem \
@@ -60,12 +62,12 @@ lkctl sign \
 
 ### 5. 交付与验证
 
-把 `license.lic` 发给客户，放到应用默认路径（或用 `LICENSE_FILE` 环境变量指定），应用启动时自动校验。也可手动验证：
+把 `license.lic` 发给客户，放到应用默认路径（或用 `LICENSE_FILE` 环境变量指定），应用启动时自动校验。也可手动验证（通用 lkctl 需指定公钥）：
 
 ```bash
-lkctl verify license.lic          # 退出码 0=有效 1=无效
-lkctl verify license.lic --json   # JSON 格式结果
-lkctl info license.lic        # 查看许可证内容
+lkctl verify license.lic --public-key keys/public.pem    # 退出码 0=有效 1=无效
+lkctl verify license.lic --public-key keys/public.pem --json
+lkctl info license.lic   --public-key keys/public.pem    # 查看许可证内容
 ```
 
 ## 应用集成
@@ -103,18 +105,16 @@ func main() {
 2. 可执行文件同目录下的 `license.lic`
 3. Unix: `/etc/<程序名>/license.lic`
 
-### 公钥内嵌（生产必需）
+### 公钥内嵌（应用侧集成步骤）
 
-仓库内置的 `pkg/license/key.go` 是**演示密钥**（配对私钥在 `testdata/private.pem`，仅用于测试），生产环境必须替换为你自己的：
+`lkctl` 本身是通用工具：`sign` 只需私钥、`verify` 用 `--public-key` 指定公钥，都不依赖内嵌。`lkctl embed` 仅在你**开发客户应用**时使用——把公钥经 XOR 混淆后生成为 Go 源文件（防止 `strings` 直接搜出），随你的应用一起编译。部署机器上没有任何 `.pem` / `.key` 文件：
 
 ```bash
 lkctl embed --public-key keys/public.pem --out pkg/license/key.go
 ```
 
-生成的文件将公钥经 XOR 混淆后内嵌（防止 `strings` 直接搜出），随你的应用一起编译。部署机器上没有任何 `.pem` / `.key` 文件。
-
-> 直接以 Go module 方式引用本项目、不便替换 `key.go` 时，改用运行时注入：
-> `license.UsePublicKeyPEM(publicKeyPEM)` 后再调用 `license.MustCheck()`。
+- **lkctl 本身是通用工具**：`sign` 只依赖 `--private-key`，`verify` 用 `--public-key` 指定公钥；仅当构建的 lkctl 内嵌了公钥且与签名私钥不配对时，sign 会给出警告（不阻断）
+- 直接以 Go module 方式引用本项目、不便放置 `key.go` 时，改用运行时注入：`license.UsePublicKeyPEM(publicKeyPEM)` 后再调用 `license.MustCheck()`
 
 ## 命令参考
 
@@ -179,7 +179,7 @@ if result.Valid {
 ## 安全说明
 
 1. **私钥只在你手里**：签发私钥绝不下发，泄露即可伪造许可证
-2. **演示密钥仅用于测试**：仓库自带的 `testdata/private.pem` 与内嵌公钥配对，公开可见，生产前必须执行 `lkctl keygen` + `lkctl embed` 替换
+2. **仓库不含任何密钥**：不提供演示密钥对，密钥对由你通过 `lkctl keygen` 自行生成
 3. **防篡改靠签名**：许可证为明文 JSON，任何人可读，但无法在无私钥的情况下修改内容
 4. **无防回拨/吊销**：离线验证不校验系统时间回拨，也不支持吊销列表，需要时请自行扩展
 
@@ -187,7 +187,7 @@ if result.Valid {
 
 ```bash
 docker build -t license-key-verify .
-docker run --rm license-key-verify --help
+docker run --rm license-key-verify help
 docker run --rm -v $(pwd):/workspace license-key-verify fingerprint
 ```
 
@@ -195,10 +195,8 @@ docker run --rm -v $(pwd):/workspace license-key-verify fingerprint
 
 ```bash
 make test          # 单元测试
-make test-e2e      # 端到端测试
+make test-e2e      # 端到端测试（自生成密钥，不依赖仓库密钥）
 make build-all     # 全平台构建
-make demo          # 生成示例许可证
-make verify-demo   # 验证示例
 ```
 
 ## 常见问题
@@ -206,8 +204,8 @@ make verify-demo   # 验证示例
 **Q: 客户复制 license 文件到别的机器能用吗？**
 不能。指纹不匹配，验证失败。
 
-**Q: 忘记内嵌新公钥会怎样？**
-应用仍携带演示公钥，你的许可证验证失败（`signature verification failed`）。执行 `lkctl embed` 后重新编译即可。
+**Q: 忘记内嵌公钥会怎样？**
+`sign` 不受影响（它只依赖私钥）。`lkctl verify` 会提示改用 `--public-key <pem>`；你的应用若未内嵌公钥，校验时报 `no public key available`——执行 `lkctl embed` 把 key.go 放进应用工程重新编译即可。
 
 **Q: 支持 Windows / macOS / Linux 吗？**
 支持。指纹采集与构建均覆盖三大平台。

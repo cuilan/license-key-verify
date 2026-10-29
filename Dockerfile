@@ -45,7 +45,7 @@ WORKDIR /app
 ENTRYPOINT ["lkctl"]
 
 # Default command to run when the container starts
-CMD ["--help"]
+CMD ["help"]
 
 # --- 生产部署时用宿主机指纹绑定：
 # docker run \

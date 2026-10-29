@@ -27,7 +27,10 @@ func setupTestKey(t *testing.T) (privateKeyPEM []byte) {
 		t.Fatalf("PublicKeyToPEM() error = %v", err)
 	}
 	t.Cleanup(func() {
-		_ = UsePublicKeyPEM(embeddedPublicKey) // 恢复内置公钥
+		// 回到"未内嵌公钥"基线（仓库不含演示密钥）
+		keyMu.Lock()
+		globalKey = nil
+		keyMu.Unlock()
 	})
 	if err := UsePublicKeyPEM(publicKeyPEM); err != nil {
 		t.Fatalf("UsePublicKeyPEM() error = %v", err)
@@ -218,4 +221,41 @@ func ComputeTestFingerprint(t *testing.T) string {
 		return strings.Repeat("0", 64) // 本机无指纹：验证会在签名后因指纹不匹配而失败
 	}
 	return fp
+}
+
+func TestEmbeddedKeyLifecycle(t *testing.T) {
+	// 基线：无内嵌公钥（模拟未 embed 的全新 clone）
+	keyMu.Lock()
+	globalKey = nil
+	keyMu.Unlock()
+
+	if HasEmbeddedKey() {
+		t.Fatal("HasEmbeddedKey() should be false before UsePublicKeyPEM")
+	}
+	if _, err := EmbeddedKeyPEM(); err == nil {
+		t.Fatal("EmbeddedKeyPEM() should fail before UsePublicKeyPEM")
+	}
+
+	// 注入公钥后可用，且 PEM 可被还原
+	keyPair, err := crypto.GenerateKeyPair()
+	if err != nil {
+		t.Fatalf("GenerateKeyPair() error = %v", err)
+	}
+	publicKeyPEM, err := keyPair.PublicKeyToPEM()
+	if err != nil {
+		t.Fatalf("PublicKeyToPEM() error = %v", err)
+	}
+	if err := UsePublicKeyPEM(publicKeyPEM); err != nil {
+		t.Fatalf("UsePublicKeyPEM() error = %v", err)
+	}
+	if !HasEmbeddedKey() {
+		t.Fatal("HasEmbeddedKey() should be true after UsePublicKeyPEM")
+	}
+	pem, err := EmbeddedKeyPEM()
+	if err != nil {
+		t.Fatalf("EmbeddedKeyPEM() error = %v", err)
+	}
+	if _, err := crypto.LoadPublicKeyFromPEM(pem); err != nil {
+		t.Fatalf("embedded PEM should be loadable: %v", err)
+	}
 }

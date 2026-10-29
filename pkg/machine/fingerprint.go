@@ -3,16 +3,17 @@
 // 经 SHA-256 计算得到，同一台机器重复计算结果一致，不同机器结果不同。
 //
 // 容器内场景：
-//   默认宿主标识路径在容器中不可见。如果容器通过 bind mount 暴露了宿主硬件信息，
-//   优先读取 /host/* 下的路径（与 Dockerfile 建议的 --mount 配合）：
 //
-//     docker run \
-//       --mount type=bind,source=/etc/machine-id,target=/host/etc/machine-id,readonly \
-//       --mount type=bind,source=/sys/class/dmi/id,target=/host/sys/class/dmi/id,readonly \
-//       --network host \
-//       your-image
+//	默认宿主标识路径在容器中不可见。如果容器通过 bind mount 暴露了宿主硬件信息，
+//	优先读取 /host/* 下的路径（与 Dockerfile 建议的 --mount 配合）：
 //
-//   这样容器内指纹 = 宿主裸机指纹，docker save 到新宿主机后指纹必然不同。
+//	  docker run \
+//	    --mount type=bind,source=/etc/machine-id,target=/host/etc/machine-id,readonly \
+//	    --mount type=bind,source=/sys/class/dmi/id,target=/host/sys/class/dmi/id,readonly \
+//	    --network host \
+//	    your-image
+//
+//	这样容器内指纹 = 宿主裸机指纹，docker save 到新宿主机后指纹必然不同。
 package machine
 
 import (
@@ -50,9 +51,9 @@ func StableID() (string, error) {
 	case "linux":
 		paths := []string{
 			hostMountPrefix + "/sys/class/dmi/id/product_uuid", // 宿主 DMI（通过 bind mount）
-			"/sys/class/dmi/id/product_uuid",                  // 容器内 DMI
-			hostMountPrefix + "/etc/machine-id",               // 宿主 machine-id（通过 bind mount）
-			"/etc/machine-id",                                 // 容器自身
+			"/sys/class/dmi/id/product_uuid",                   // 容器内 DMI
+			hostMountPrefix + "/etc/machine-id",                // 宿主 machine-id（通过 bind mount）
+			"/etc/machine-id",                                  // 容器自身
 			"/var/lib/dbus/machine-id",
 		}
 		for _, path := range paths {

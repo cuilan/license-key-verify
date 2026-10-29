@@ -51,9 +51,9 @@ func (kp *KeyPair) PrivateKeyToPEM() ([]byte, error) {
 	return privateKeyPEM, nil
 }
 
-// PublicKeyToPEM 将公钥转换为PEM格式
-func (kp *KeyPair) PublicKeyToPEM() ([]byte, error) {
-	publicKeyBytes, err := x509.MarshalPKIXPublicKey(kp.PublicKey)
+// PublicKeyToPEM 将 RSA 公钥序列化为 PEM 格式
+func PublicKeyToPEM(publicKey *rsa.PublicKey) ([]byte, error) {
+	publicKeyBytes, err := x509.MarshalPKIXPublicKey(publicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal public key: %v", err)
 	}
@@ -64,6 +64,11 @@ func (kp *KeyPair) PublicKeyToPEM() ([]byte, error) {
 	})
 
 	return publicKeyPEM, nil
+}
+
+// PublicKeyToPEM 将公钥转换为PEM格式（委托给包级函数）
+func (kp *KeyPair) PublicKeyToPEM() ([]byte, error) {
+	return PublicKeyToPEM(kp.PublicKey)
 }
 
 // LoadPrivateKeyFromPEM 从PEM格式加载私钥

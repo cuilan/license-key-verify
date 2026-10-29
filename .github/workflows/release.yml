@@ -1,13 +1,14 @@
 name: Release
 
 on:
+  push:
+    tags: [ 'v*' ]
   workflow_dispatch:
     inputs:
-      release_all_platforms:
-        description: '是否发布所有平台'
-        required: false
-        default: true
-        type: boolean
+      tag_name:
+        description: 'Tag to release (e.g. v2.0.0); must be an existing tag'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -46,31 +47,30 @@ jobs:
     - name: 创建发布包
       run: make release
 
-    - name: 生成变更日志
-      id: changelog
+    - name: Generate release notes
       run: |
-        # 获取上一个标签
-        PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-        
-        # 生成变更日志
-        if [ -n "$PREVIOUS_TAG" ]; then
-          echo "## 变更内容" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> CHANGELOG.md
-        else
-          echo "## 首次发布" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          echo "这是项目的首次发布版本。" >> CHANGELOG.md
-        fi
-        
-        # 将变更日志写入文件，供后续步骤使用
-        echo "变更日志已生成: CHANGELOG.md"
+        set -e
+        TAG="${{ inputs.tag_name || github.ref_name }}"
+        # Find the previous tag (excluding the one being released)
+        PREVIOUS_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -n 1 || true)
 
-    - name: 创建 GitHub Release
+        # Write to a temp file -- never overwrite the repo's CHANGELOG.md
+        NOTES="/tmp/release_notes.md"
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "## Changes" > "$NOTES"
+          echo "" >> "$NOTES"
+          git log --pretty=format:"- %s (%h)" "${PREVIOUS_TAG}..${TAG}" >> "$NOTES"
+        else
+          echo "First release of ${TAG}" > "$NOTES"
+        fi
+        echo "Release notes written to $NOTES"
+
+    - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        name: Release ${{ github.ref_name }}
-        body_path: CHANGELOG.md
+        tag_name: ${{ inputs.tag_name || github.ref_name }}
+        name: Release ${{ inputs.tag_name || github.ref_name }}
+        body_path: /tmp/release_notes.md
         files: |
           dist/release/*.zip
         draft: false

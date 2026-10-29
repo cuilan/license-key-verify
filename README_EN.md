@@ -1,4 +1,4 @@
-# License Key Verify Tool
+﻿# License Key Verify Tool
 
 [![CI](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/ci.yml)
 [![Release](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml/badge.svg)](https://github.com/cuilan/license-key-verify/actions/workflows/release.yml)
@@ -23,7 +23,7 @@ License signing and verification for software licensing: **one-line integration,
 ### 1. Build
 
 ```bash
-make build   # produces bin/lkctl
+make build   # produces bin/lkctl (bin/lkctl.exe on Windows)
 ```
 
 ### 2. Generate a key pair (on your machine)
@@ -47,6 +47,8 @@ lkctl fingerprint
 
 ### 4. Sign the license (on your machine)
 
+`sign` only needs the private key — lkctl is a generic tool, no embedding or rebuild required:
+
 ```bash
 lkctl sign \
   --private-key keys/private.pem \
@@ -60,12 +62,12 @@ lkctl sign \
 
 ### 5. Deliver and verify
 
-Send `license.lic` to the customer. Drop it at the app's default location (or point `LICENSE_FILE` to it) and the app validates on startup. Manual verification:
+Send `license.lic` to the customer. Drop it at the app's default location (or point `LICENSE_FILE` to it) and the app validates on startup. Manual verification (a generic lkctl needs the public key):
 
 ```bash
-lkctl verify license.lic          # exit code 0=valid 1=invalid
-lkctl verify license.lic --json   # JSON output
-lkctl info license.lic        # show license content
+lkctl verify license.lic --public-key keys/public.pem    # exit code 0=valid 1=invalid
+lkctl verify license.lic --public-key keys/public.pem --json
+lkctl info license.lic   --public-key keys/public.pem    # show license content
 ```
 
 ## Application Integration
@@ -103,18 +105,16 @@ License path resolution order:
 2. `license.lic` next to the executable
 3. Unix: `/etc/<program-name>/license.lic`
 
-### Embedding the public key (required for production)
+### Embedding the public key (application-side integration step)
 
-The committed `pkg/license/key.go` contains a **demo key** (paired private key at `testdata/private.pem`, for testing only). For production, replace it with your own:
+`lkctl` itself is a generic tool: `sign` only needs the private key and `verify` takes `--public-key`; neither depends on embedding. `lkctl embed` is used when **you develop the customer-facing app** — it generates a Go source file containing your public key with light XOR obfuscation (so `strings` cannot dump it directly); it compiles into your app. Deployment machines hold no `.pem` / `.key` files at all:
 
 ```bash
 lkctl embed --public-key keys/public.pem --out pkg/license/key.go
 ```
 
-The generated file embeds your public key with light XOR obfuscation (so `strings` cannot dump it directly) and compiles into your app. Deployment machines hold no `.pem` / `.key` files at all.
-
-> If you consume this project as a Go module and cannot replace `key.go`, inject the key at runtime instead:
-> call `license.UsePublicKeyPEM(publicKeyPEM)` before `license.MustCheck()`.
+- If you consume this project as a Go module and cannot ship a `key.go`, inject the key at runtime instead:
+  call `license.UsePublicKeyPEM(publicKeyPEM)` before `license.MustCheck()`.
 
 ## Command Reference
 
@@ -179,7 +179,7 @@ fingerprint = `SHA-256(version | platform stable id | sorted MAC list)`
 ## Security Notes
 
 1. **The private key never leaves you**: leaking it means anyone can forge licenses
-2. **The demo key is for testing only**: the bundled `testdata/private.pem` matches the embedded public key and is public; always run `lkctl keygen` + `lkctl embed` before production
+2. **The repo ships no keys at all**: there is no demo key pair; signing and verification are impossible until `lkctl embed` has been run, which prevents "forgot to swap the key" incidents
 3. **Tamper protection comes from the signature**: licenses are readable JSON; nobody can modify content without the private key
 4. **No rollback/revocation**: offline verification does not detect clock rollback and has no revocation list; extend it yourself if needed
 
@@ -187,7 +187,7 @@ fingerprint = `SHA-256(version | platform stable id | sorted MAC list)`
 
 ```bash
 docker build -t license-key-verify .
-docker run --rm license-key-verify --help
+docker run --rm license-key-verify help
 docker run --rm -v $(pwd):/workspace license-key-verify fingerprint
 ```
 
@@ -195,10 +195,8 @@ docker run --rm -v $(pwd):/workspace license-key-verify fingerprint
 
 ```bash
 make test          # unit tests
-make test-e2e      # end-to-end tests
+make test-e2e      # end-to-end tests (generates its own keys)
 make build-all     # cross-platform build
-make demo          # generate a demo license
-make verify-demo   # verify the demo
 ```
 
 ## FAQ
@@ -206,8 +204,8 @@ make verify-demo   # verify the demo
 **Q: Can the license file be copied to another machine?**
 No. The fingerprint mismatch fails verification.
 
-**Q: What if I forget to embed my own public key?**
-The app still carries the demo public key and your license fails with `signature verification failed`. Run `lkctl embed` and rebuild.
+**Q: What if I forget to embed the public key?**
+`sign` is unaffected (it only needs the private key). `lkctl verify` tells you to pass `--public-key <pem>`; your app without an embedded key reports `no public key available` at check time — run `lkctl embed` and put key.go into your app, then rebuild.
 
 **Q: Are Windows / macOS / Linux supported?**
 Yes. Fingerprint collection and builds cover all three platforms.
