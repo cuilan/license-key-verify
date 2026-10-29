@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cuilan/license-key-verify/pkg/license"
+	"github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 // applyPublicKeyOverride 当指定 --public-key 时用它覆盖内置公钥（调试/测试用）。

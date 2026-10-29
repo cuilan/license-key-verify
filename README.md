@@ -45,7 +45,7 @@ lkctl embed --public-key keys/public.pem --out internal/licensekey/key.go
 ```go
 import (
     _ "yourapp/internal/licensekey" // 注册公钥
-    "github.com/cuilan/license-key-verify/pkg/license"
+    "github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func main() {
@@ -106,7 +106,7 @@ fork 本仓库并用 `lkctl embed` 覆盖 `pkg/license/key.go` 后（key.go 属�
 ```go
 package main
 
-import _ "github.com/cuilan/license-key-verify/autocheck"
+import _ "github.com/cuilan/license-key-verify/v2/autocheck"
 
 func main() {
     // init() 中已完成校验，失败直接退出
@@ -120,7 +120,7 @@ package main
 
 import (
     _ "yourapp/internal/licensekey" // 注册公钥
-    "github.com/cuilan/license-key-verify/pkg/license"
+    "github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func main() {

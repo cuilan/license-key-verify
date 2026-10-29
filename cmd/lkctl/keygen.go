@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cuilan/license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/v2/pkg/crypto"
 )
 
 func handleKeygen() {

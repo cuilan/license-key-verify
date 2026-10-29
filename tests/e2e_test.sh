@@ -117,7 +117,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cuilan/license-key-verify/pkg/license"
+	"github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func main() {

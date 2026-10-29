@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/cuilan/license-key-verify/pkg/machine"
+	"github.com/cuilan/license-key-verify/v2/pkg/machine"
 )
 
 // DefaultLicensePath 返回默认的许可证文件路径，解析顺序：

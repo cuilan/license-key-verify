@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cuilan/license-key-verify/pkg/crypto"
-	"github.com/cuilan/license-key-verify/pkg/machine"
+	"github.com/cuilan/license-key-verify/v2/pkg/crypto"
+	"github.com/cuilan/license-key-verify/v2/pkg/machine"
 )
 
 var (

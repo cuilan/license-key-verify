@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cuilan/license-key-verify/pkg/crypto"
-	"github.com/cuilan/license-key-verify/pkg/license"
+	"github.com/cuilan/license-key-verify/v2/pkg/crypto"
+	"github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func handleSign() {

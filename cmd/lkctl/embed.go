@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cuilan/license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/v2/pkg/crypto"
 )
 
 // xorKey 公钥混淆用的异或密钥
@@ -67,7 +67,7 @@ func handleEmbed() {
 
 	// 同包场景（fork 仓库替换 pkg/license/key.go）直接调包内函数；
 	// 其他包场景 import 本模块的 license 包注册。
-	const licensePkgPath = "github.com/cuilan/license-key-verify/pkg/license"
+	const licensePkgPath = "github.com/cuilan/license-key-verify/v2/pkg/license"
 	var initBlock string
 	if *pkgName == "license" {
 		initBlock = `

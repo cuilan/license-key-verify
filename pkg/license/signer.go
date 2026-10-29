@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/cuilan/license-key-verify/pkg/crypto"
+	"github.com/cuilan/license-key-verify/v2/pkg/crypto"
 )
 
 // Sign 签发许可证：构造 License 结构并用私钥对内容签名。

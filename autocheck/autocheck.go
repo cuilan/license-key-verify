@@ -1,6 +1,6 @@
 // Package autocheck 提供「import 即校验」的零代码集成方式：
 //
-//	import _ "github.com/cuilan/license-key-verify/autocheck"
+//	import _ "github.com/cuilan/license-key-verify/v2/autocheck"
 //
 // 包初始化时自动定位许可证文件并使用内置公钥验签：
 //   - 解析顺序：环境变量 LICENSE_FILE → 可执行文件同目录 license.lic → /etc/<程序名>/license.lic
@@ -17,7 +17,7 @@
 //	  - 直接引用模块：把 embed 生成的 key.go 放进应用的一个子包
 //	    （如 internal/licensekey/），并在 autocheck 之前 import 它：
 //	      import _ "yourapp/internal/licensekey"
-//	      import _ "github.com/cuilan/license-key-verify/autocheck"
+//	      import _ "github.com/cuilan/license-key-verify/v2/autocheck"
 //	    放在 package main 里的 key.go 注册时机太晚，校验会报 no public key available。
 package autocheck
 
@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cuilan/license-key-verify/pkg/license"
+	"github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func init() {

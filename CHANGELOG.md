@@ -4,6 +4,7 @@
 
 ### 变更
 
+- **模块路径升级 `/v2`**：`module github.com/cuilan/license-key-verify/v2`（Go 大版本规则：v2+ tag 要求路径后缀），外部引用 `go get github.com/cuilan/license-key-verify/v2@v2.0.0`，import 路径相应加 `/v2`
 - **去掉 AES**：许可证格式改为明文 JSON + RSA-SHA256 签名（签名覆盖除 `signature` 外全部字段），删除对称加密层
 - **公钥内嵌**：`lkctl embed` 将公钥生成 Go 源文件（XOR 混淆），部署机器零密钥文件
 - **零侵入集成**：新增 `autocheck` 包（import 即校验，支持 `--fingerprint`）与 `license.Check()` / `license.MustCheck()` 一行调用
@@ -19,6 +20,7 @@
 - 旧 `lkctl gen / keys / get` 命令删除，改用 `lkctl sign / keygen / fingerprint`
 - 旧 `pkg/license` API（`NewGenerator` / `NewVerifierFromFiles` 等）删除，改用 `license.Sign` / `license.Verify` / `license.Check`
 - 旧版加密许可证文件（含 `data/algorithm` 字段）无法被新版本读取
+- import 路径需加 `/v2` 前缀：`github.com/cuilan/license-key-verify/v2/pkg/license`、`.../v2/autocheck`
 
 ## 变更内容
 

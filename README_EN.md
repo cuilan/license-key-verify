@@ -51,7 +51,7 @@ Wire the check into your app with one line (fork scenario can use `import _ auto
 ```go
 import (
     _ "yourapp/internal/licensekey" // register the public key
-    "github.com/cuilan/license-key-verify/pkg/license"
+    "github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func main() {
@@ -113,7 +113,7 @@ Fork this repo and overwrite `pkg/license/key.go` with `lkctl embed` (key.go the
 ```go
 package main
 
-import _ "github.com/cuilan/license-key-verify/autocheck"
+import _ "github.com/cuilan/license-key-verify/v2/autocheck"
 
 func main() {
     // validation happens in init(); the process exits on failure
@@ -127,7 +127,7 @@ package main
 
 import (
     _ "yourapp/internal/licensekey" // register the public key
-    "github.com/cuilan/license-key-verify/pkg/license"
+    "github.com/cuilan/license-key-verify/v2/pkg/license"
 )
 
 func main() {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cuilan/license-key-verify/pkg/crypto"
-	"github.com/cuilan/license-key-verify/pkg/machine"
+	"github.com/cuilan/license-key-verify/v2/pkg/crypto"
+	"github.com/cuilan/license-key-verify/v2/pkg/machine"
 )
 
 // setupTestKey 生成测试密钥对并设置为当前验证公钥。
