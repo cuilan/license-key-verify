@@ -20,10 +20,14 @@ License signing and verification for software licensing: **one-line integration,
 
 ## Quick Start
 
-### 1. Build
+### 1. Download lkctl
+
+Grab the archive for your platform from the [Releases](https://github.com/cuilan/license-key-verify/releases/latest) page and extract it — you get the `lkctl` binary (`lkctl.exe` on Windows). No installation needed; optionally add it to your `PATH`.
+
+For containerized environments, use the image directly:
 
 ```bash
-make build   # produces bin/lkctl (bin/lkctl.exe on Windows)
+docker pull ghcr.io/cuilan/license-key-verify:latest
 ```
 
 ### 2. Generate a key pair (on your machine)
@@ -34,10 +38,34 @@ lkctl keygen --out keys/
 # keys/public.pem   verification key, used for embedding
 ```
 
-### 3. Get the fingerprint from the customer machine
+### 3. Integrate into your app (one-time, during development)
+
+Generate the public key as a Go source file into a sub-package of your app (package name defaults to the directory name):
 
 ```bash
-# Option 1: your app embeds autocheck — just run with the flag
+lkctl embed --public-key keys/public.pem --out internal/licensekey/key.go
+```
+
+Wire the check into your app with one line (fork scenario can use `import _ autocheck`, see [Application Integration](#application-integration)):
+
+```go
+import (
+    _ "yourapp/internal/licensekey" // register the public key
+    "github.com/cuilan/license-key-verify/pkg/license"
+)
+
+func main() {
+    license.MustCheck() // prints the reason and exits with code 1 on failure
+    // ... your business code
+}
+```
+
+Rebuild your app — it can now validate licenses, and deployment machines hold zero key files.
+
+### 4. Get the fingerprint from the customer machine
+
+```bash
+# Option 1: your app has the check built in — just run with the flag
 ./your-app --fingerprint
 # output: 090499363c0b2202d7f025cd7dc2dedce65421c0a25eaccb55b890e64bf73625
 
@@ -45,9 +73,9 @@ lkctl keygen --out keys/
 lkctl fingerprint
 ```
 
-### 4. Sign the license (on your machine)
+### 5. Sign the license (on your machine)
 
-`sign` only needs the private key — lkctl is a generic tool, no embedding or rebuild required:
+`sign` only needs the private key — lkctl is a generic tool, no need to rebuild lkctl:
 
 ```bash
 lkctl sign \
@@ -60,7 +88,7 @@ lkctl sign \
   --out license.lic
 ```
 
-### 5. Deliver and verify
+### 6. Deliver and verify
 
 Send `license.lic` to the customer. Drop it at the app's default location (or point `LICENSE_FILE` to it) and the app validates on startup. Manual verification (a generic lkctl needs the public key):
 
@@ -72,7 +100,15 @@ lkctl info license.lic   --public-key keys/public.pem    # show license content
 
 ## Application Integration
 
-### Mode A: import-side-effect check (zero code changes)
+> **Where to put key.go?** Put it in a **sub-package** of your app (e.g. `internal/licensekey/`):
+> `lkctl embed --public-key keys/public.pem --out internal/licensekey/key.go`
+> (the package name defaults to the directory name). Do NOT put it in package main —
+> Go initializes imported packages before the main package; a key.go in package main
+> registers the key too late.
+
+### Mode A: import-side-effect check (zero code changes, fork scenario)
+
+Fork this repo and overwrite `pkg/license/key.go` with `lkctl embed` (key.go then lives in an imported package, initialized before autocheck):
 
 ```go
 package main
@@ -84,12 +120,15 @@ func main() {
 }
 ```
 
-### Mode B: explicit one-line call
+### Mode B: explicit one-line call (direct module usage)
 
 ```go
 package main
 
-import "github.com/cuilan/license-key-verify/pkg/license"
+import (
+    _ "yourapp/internal/licensekey" // register the public key
+    "github.com/cuilan/license-key-verify/pkg/license"
+)
 
 func main() {
     license.MustCheck() // prints the reason and exits with code 1
@@ -110,7 +149,11 @@ License path resolution order:
 `lkctl` itself is a generic tool: `sign` only needs the private key and `verify` takes `--public-key`; neither depends on embedding. `lkctl embed` is used when **you develop the customer-facing app** — it generates a Go source file containing your public key with light XOR obfuscation (so `strings` cannot dump it directly); it compiles into your app. Deployment machines hold no `.pem` / `.key` files at all:
 
 ```bash
+# Fork scenario: overwrite pkg/license/key.go (pairs with Mode A)
 lkctl embed --public-key keys/public.pem --out pkg/license/key.go
+
+# Module scenario: generate into a sub-package of your app (package name = directory name, pairs with Mode B)
+lkctl embed --public-key keys/public.pem --out internal/licensekey/key.go
 ```
 
 - If you consume this project as a Go module and cannot ship a `key.go`, inject the key at runtime instead:
@@ -179,30 +222,25 @@ fingerprint = `SHA-256(version | platform stable id | sorted MAC list)`
 ## Security Notes
 
 1. **The private key never leaves you**: leaking it means anyone can forge licenses
-2. **The repo ships no keys at all**: there is no demo key pair; signing and verification are impossible until `lkctl embed` has been run, which prevents "forgot to swap the key" incidents
+2. **The repo ships no keys at all**: there is no demo key pair; generate your own via `lkctl keygen`
 3. **Tamper protection comes from the signature**: licenses are readable JSON; nobody can modify content without the private key
 4. **No rollback/revocation**: offline verification does not detect clock rollback and has no revocation list; extend it yourself if needed
 
 ## Docker
 
 ```bash
-docker build -t license-key-verify .
-docker run --rm license-key-verify help
-docker run --rm -v $(pwd):/workspace license-key-verify fingerprint
-```
-
-## Development
-
-```bash
-make test          # unit tests
-make test-e2e      # end-to-end tests (generates its own keys)
-make build-all     # cross-platform build
+docker run --rm ghcr.io/cuilan/license-key-verify:latest help
+docker run --rm -v $(pwd):/workspace ghcr.io/cuilan/license-key-verify:latest fingerprint
+docker run --rm -v $(pwd):/workspace ghcr.io/cuilan/license-key-verify:latest verify /workspace/license.lic --public-key /workspace/keys/public.pem
 ```
 
 ## FAQ
 
 **Q: Can the license file be copied to another machine?**
 No. The fingerprint mismatch fails verification.
+
+**Q: Does goimports reordering imports affect the check order?**
+No. Go's package initialization order is determined by import dependencies, not by the order in source or formatting tools. In the fork scenario key.go lives inside `pkg/license`, a dependency of autocheck, so the order is guaranteed; with direct module usage autocheck and your key package are independent and their order is unspecified — use Mode B (`license.MustCheck()`).
 
 **Q: What if I forget to embed the public key?**
 `sign` is unaffected (it only needs the private key). `lkctl verify` tells you to pass `--public-key <pem>`; your app without an embedded key reports `no public key available` at check time — run `lkctl embed` and put key.go into your app, then rebuild.

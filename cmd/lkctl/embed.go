@@ -27,7 +27,7 @@ func handleEmbed() {
 	}
 
 	// 未显式指定包名时，从输出目录已有的 Go 文件检测包名：
-	// 放进 pkg/license/（同包）与放进应用目录（main 等外部包）都能直接编译。
+	// 放进 pkg/license/（同包）与放进应用子包（如 licensekey/）都能直接编译。
 	explicitPkg := false
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "package" {
@@ -35,11 +35,16 @@ func handleEmbed() {
 		}
 	})
 	if !explicitPkg {
-		if detected := detectPackage(filepath.Dir(*out), filepath.Base(*out)); detected != "" {
+		dir := filepath.Dir(*out)
+		if detected := detectPackage(dir, filepath.Base(*out)); detected != "" {
 			*pkgName = detected
+		} else if base := filepath.Base(dir); isValidPkgName(base) {
+			// 空目录（新建子包场景）：沿用 Go 惯例，包名 = 目录名
+			*pkgName = base
+			fmt.Printf("Note: no Go files found next to the output, using directory name %q as package name\n", base)
 		} else {
 			*pkgName = "license"
-			fmt.Println("Note: no Go files found next to the output, falling back to package \"license\"")
+			fmt.Println("Note: falling back to package \"license\"")
 		}
 	} else if *pkgName == "" {
 		fatal("--package cannot be empty")
@@ -105,6 +110,9 @@ func decodeXOR(data string, key byte) []byte {
 }
 `, *pkgName, initBlock, encoded, xorKey)
 
+	if err := os.MkdirAll(filepath.Dir(*out), 0755); err != nil {
+		fatal("Failed to create output directory: %v", err)
+	}
 	if err := os.WriteFile(*out, []byte(code), 0644); err != nil {
 		fatal("Failed to write output file: %v", err)
 	}
@@ -138,4 +146,21 @@ func detectPackage(dir, exclude string) string {
 		}
 	}
 	return ""
+}
+
+// isValidPkgName 判断是否为合法的 Go 包名（小写字母开头，字母/数字/下划线）。
+func isValidPkgName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9' && i > 0:
+		case r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }

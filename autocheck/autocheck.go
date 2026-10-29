@@ -9,8 +9,16 @@
 // 同时自动支持 `--fingerprint` 参数：带该参数启动时打印本机指纹后退出，
 // 供客户把指纹发回给你签发许可证。
 //
-// 注意：autocheck 使用编译进 pkg/license/key.go 的内置公钥。
-// 直接引用本模块（未 fork 替换 key.go）的项目请改用 license.UsePublicKeyPEM + license.MustCheck。
+// 公钥来源（Go 初始化顺序要求）：
+//
+//	Go 先初始化被导入包、后初始化 main 包，而本校验发生在 autocheck 的 init 里，
+//	因此公钥必须来自「被导入的包」：
+//	  - fork 本仓库：lkctl embed 覆盖 pkg/license/key.go（同包，天然满足）；
+//	  - 直接引用模块：把 embed 生成的 key.go 放进应用的一个子包
+//	    （如 internal/licensekey/），并在 autocheck 之前 import 它：
+//	      import _ "yourapp/internal/licensekey"
+//	      import _ "github.com/cuilan/license-key-verify/autocheck"
+//	    放在 package main 里的 key.go 注册时机太晚，校验会报 no public key available。
 package autocheck
 
 import (

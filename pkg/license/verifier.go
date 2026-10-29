@@ -37,7 +37,8 @@ func currentKey() (*rsa.PublicKey, error) {
 	keyMu.RLock()
 	defer keyMu.RUnlock()
 	if globalKey == nil {
-		return nil, errors.New("no public key available: embedded key is invalid, call license.UsePublicKeyPEM first")
+		return nil, errors.New("no public key available: call license.UsePublicKeyPEM before verifying" +
+			" (note: a generated key.go in package main registers too late for autocheck — put it in a sub-package)")
 	}
 	return globalKey, nil
 }

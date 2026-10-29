@@ -42,3 +42,18 @@ func TestDetectPackage(t *testing.T) {
 		t.Fatalf("regenerate: got %q, want main", got)
 	}
 }
+
+func TestIsValidPkgName(t *testing.T) {
+	valid := []string{"main", "licensekey", "license_key", "a", "pkg2"}
+	for _, name := range valid {
+		if !isValidPkgName(name) {
+			t.Errorf("isValidPkgName(%q) = false, want true", name)
+		}
+	}
+	invalid := []string{"", "2pkg", "MyPkg", "pkg-key", "pkg key", "."}
+	for _, name := range invalid {
+		if isValidPkgName(name) {
+			t.Errorf("isValidPkgName(%q) = true, want false", name)
+		}
+	}
+}
