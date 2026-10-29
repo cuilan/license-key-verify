@@ -24,12 +24,6 @@ License signing and verification for software licensing: **one-line integration,
 
 Grab the archive for your platform from the [Releases](https://github.com/cuilan/license-key-verify/releases/latest) page and extract it — you get the `lkctl` binary (`lkctl.exe` on Windows). No installation needed; optionally add it to your `PATH`.
 
-For containerized environments, use the image directly:
-
-```bash
-docker pull ghcr.io/cuilan/license-key-verify:latest
-```
-
 ### 2. Generate a key pair (on your machine)
 
 ```bash
@@ -99,6 +93,8 @@ lkctl info license.lic   --public-key keys/public.pem    # show license content
 ```
 
 ## Application Integration
+
+Fully runnable examples (both autocheck and SDK styles) live in [lkctl-examples](https://github.com/cuilan/lkctl-examples).
 
 > **Where to put key.go?** Put it in a **sub-package** of your app (e.g. `internal/licensekey/`):
 > `lkctl embed --public-key keys/public.pem --out internal/licensekey/key.go`
@@ -225,28 +221,6 @@ fingerprint = `SHA-256(version | platform stable id | sorted MAC list)`
 2. **The repo ships no keys at all**: there is no demo key pair; generate your own via `lkctl keygen`
 3. **Tamper protection comes from the signature**: licenses are readable JSON; nobody can modify content without the private key
 4. **No rollback/revocation**: offline verification does not detect clock rollback and has no revocation list; extend it yourself if needed
-
-## Docker
-
-```bash
-docker run --rm ghcr.io/cuilan/license-key-verify:latest help
-docker run --rm -v $(pwd):/workspace ghcr.io/cuilan/license-key-verify:latest fingerprint
-docker run --rm -v $(pwd):/workspace ghcr.io/cuilan/license-key-verify:latest verify /workspace/license.lic --public-key /workspace/keys/public.pem
-```
-
-## FAQ
-
-**Q: Can the license file be copied to another machine?**
-No. The fingerprint mismatch fails verification.
-
-**Q: Does goimports reordering imports affect the check order?**
-No. Go's package initialization order is determined by import dependencies, not by the order in source or formatting tools. In the fork scenario key.go lives inside `pkg/license`, a dependency of autocheck, so the order is guaranteed; with direct module usage autocheck and your key package are independent and their order is unspecified — use Mode B (`license.MustCheck()`).
-
-**Q: What if I forget to embed the public key?**
-`sign` is unaffected (it only needs the private key). `lkctl verify` tells you to pass `--public-key <pem>`; your app without an embedded key reports `no public key available` at check time — run `lkctl embed` and put key.go into your app, then rebuild.
-
-**Q: Are Windows / macOS / Linux supported?**
-Yes. Fingerprint collection and builds cover all three platforms.
 
 ## License
 

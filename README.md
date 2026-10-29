@@ -94,6 +94,8 @@ lkctl info license.lic   --public-key keys/public.pem    # 查看许可证内容
 
 ## 应用集成
 
+完整可运行的示例（autocheck 与 SDK 两种方式）见 [lkctl-examples](https://github.com/cuilan/lkctl-examples)。
+
 > **key.go 放哪里？** 放进应用的一个**子包**（如 `internal/licensekey/`）：
 > `lkctl embed --public-key keys/public.pem --out internal/licensekey/key.go`
 > （包名自动取目录名）。不要放在 package main——Go 先初始化被导入包、后初始化 main 包，
@@ -218,28 +220,6 @@ if result.Valid {
 2. **仓库不含任何密钥**：不提供演示密钥对，密钥对由你通过 `lkctl keygen` 自行生成
 3. **防篡改靠签名**：许可证为明文 JSON，任何人可读，但无法在无私钥的情况下修改内容
 4. **无防回拨/吊销**：离线验证不校验系统时间回拨，也不支持吊销列表，需要时请自行扩展
-
-## Docker
-
-```bash
-docker run --rm ghcr.io/cuilan/license-key-verify:latest help
-docker run --rm -v $(pwd):/workspace ghcr.io/cuilan/license-key-verify:latest fingerprint
-docker run --rm -v $(pwd):/workspace ghcr.io/cuilan/license-key-verify:latest verify /workspace/license.lic --public-key /workspace/keys/public.pem
-```
-
-## 常见问题
-
-**Q: 客户复制 license 文件到别的机器能用吗？**
-不能。指纹不匹配，验证失败。
-
-**Q: goimports 会重排 import，影响校验顺序吗？**
-不会。Go 的包初始化顺序由依赖关系决定，与 import 书写顺序、格式化工具无关。fork 场景中 key.go 位于 autocheck 的依赖包 `pkg/license` 内，顺序有保证；直接引用模块时 autocheck 与你的 key 包互不依赖、顺序不定，请使用模式 B（`license.MustCheck()`）。
-
-**Q: 忘记内嵌公钥会怎样？**
-`sign` 不受影响（它只依赖私钥）。`lkctl verify` 会提示改用 `--public-key <pem>`；你的应用若未内嵌公钥，校验时报 `no public key available`——执行 `lkctl embed` 把 key.go 放进应用工程重新编译即可。
-
-**Q: 支持 Windows / macOS / Linux 吗？**
-支持。指纹采集与构建均覆盖三大平台。
 
 ## 许可证
 
