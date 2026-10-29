@@ -1,0 +1,30 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+.idea
+# Test binary, built with `go test -c`
+*.test
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+logs
+release
+vendor
+.DS_Store
+
+bin
+dist
+release
+lkctl
+lkctl.exe
+demo
+vendor
+coverage.html
+coverage.out
+*.lic
+*.key
+*.pem
+!testdata/*.pem
+test_run
