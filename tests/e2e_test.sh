@@ -22,6 +22,20 @@ case "$(uname -s)" in
 esac
 TEST_DIR="$SCRIPT_DIR/test_run"
 
+# Convert a POSIX path into a path the native lkctl binary understands.
+# WSL bash passes "/mnt/c/..." to a Windows binary, which resolves it as
+# "\mnt\c\..." (i.e. C:\mnt\c\...) -- every file lands in the wrong place.
+# MSYS/Git Bash performs this conversion automatically; Linux needs nothing.
+to_native_path() {
+    if [ -n "$WSL_DISTRO_NAME" ] && command -v wslpath > /dev/null 2>&1; then
+        wslpath -w "$1" | sed 's|\\|/|g'
+    elif [ -n "$MSYSTEM" ] && command -v cygpath > /dev/null 2>&1; then
+        cygpath -m "$1"
+    else
+        echo "$1"
+    fi
+}
+
 # 1. Setup test environment
 echo "---- 1. Setting up test environment ----"
 rm -rf "$TEST_DIR"
@@ -29,7 +43,7 @@ mkdir -p "$TEST_DIR"
 
 # 2. Generate a fresh key pair (users must do this too; no demo keys exist)
 echo "---- 2. lkctl keygen ----"
-$LKCTL keygen --out "$TEST_DIR/keys"
+$LKCTL keygen --out "$(to_native_path "$TEST_DIR/keys")"
 PRIVATE_KEY="$TEST_DIR/keys/private.pem"
 PUBLIC_KEY="$TEST_DIR/keys/public.pem"
 
@@ -46,17 +60,17 @@ fi
 echo "---- 4.1. sign works without any embedded key ----"
 LICENSE_FILE="$TEST_DIR/license.lic"
 $LKCTL sign \
-    --private-key "$PRIVATE_KEY" \
+    --private-key "$(to_native_path "$PRIVATE_KEY")" \
     --fingerprint "$FP" \
     --customer "E2E客户" \
     --product "demo" \
     --features "full,api" \
     --duration 30 \
-    --out "$LICENSE_FILE"
+    --out "$(to_native_path "$LICENSE_FILE")"
 
 echo "---- 4.2. verify without embedded key must ask for --public-key ----"
 set +e
-$LKCTL verify "$LICENSE_FILE" 2> /dev/null
+$LKCTL verify "$(to_native_path "$LICENSE_FILE")" 2> /dev/null
 if [ $? -eq 0 ]; then
     echo "ERROR: verify should fail without --public-key"
     exit 1
@@ -64,19 +78,19 @@ fi
 set -e
 
 echo "---- 4.3. verify with --public-key ----"
-$LKCTL verify "$LICENSE_FILE" --public-key "$PUBLIC_KEY"
+$LKCTL verify "$(to_native_path "$LICENSE_FILE")" --public-key "$(to_native_path "$PUBLIC_KEY")"
 
 echo "---- 4.4. JSON output ----"
-$LKCTL verify "$LICENSE_FILE" --public-key "$PUBLIC_KEY" --json > /dev/null
+$LKCTL verify "$(to_native_path "$LICENSE_FILE")" --public-key "$(to_native_path "$PUBLIC_KEY")" --json > /dev/null
 
 echo "---- 4.5. lkctl info ----"
-$LKCTL info "$LICENSE_FILE" --public-key "$PUBLIC_KEY" > /dev/null
+$LKCTL info "$(to_native_path "$LICENSE_FILE")" --public-key "$(to_native_path "$PUBLIC_KEY")" > /dev/null
 
 # 5. Negative cases
 echo "---- 5.1. Tampered license must be rejected ----"
 set +e
 sed 's/"customer": *"[^"]*"/"customer": "attacker"/' "$LICENSE_FILE" > "$TEST_DIR/tampered.lic"
-$LKCTL verify "$TEST_DIR/tampered.lic" --public-key "$PUBLIC_KEY" --quiet
+$LKCTL verify "$(to_native_path "$TEST_DIR/tampered.lic")" --public-key "$(to_native_path "$PUBLIC_KEY")" --quiet
 if [ $? -eq 0 ]; then
     echo "ERROR: tampered license passed verification"
     exit 1
@@ -86,10 +100,10 @@ set -e
 echo "---- 5.2. Foreign fingerprint must be rejected ----"
 set +e
 $LKCTL sign \
-    --private-key "$PRIVATE_KEY" \
+    --private-key "$(to_native_path "$PRIVATE_KEY")" \
     --fingerprint "$(printf 'a%.0s' $(seq 1 64))" \
-    --out "$TEST_DIR/foreign.lic"
-$LKCTL verify "$TEST_DIR/foreign.lic" --public-key "$PUBLIC_KEY" --quiet
+    --out "$(to_native_path "$TEST_DIR/foreign.lic")"
+$LKCTL verify "$(to_native_path "$TEST_DIR/foreign.lic")" --public-key "$(to_native_path "$PUBLIC_KEY")" --quiet
 if [ $? -eq 0 ]; then
     echo "ERROR: license with foreign fingerprint passed verification"
     exit 1
@@ -98,7 +112,7 @@ set -e
 
 echo "---- 5.3. Sign without fingerprint must fail ----"
 set +e
-$LKCTL sign --private-key "$PRIVATE_KEY" --out "$TEST_DIR/nofp.lic" 2> /dev/null
+$LKCTL sign --private-key "$(to_native_path "$PRIVATE_KEY")" --out "$(to_native_path "$TEST_DIR/nofp.lic")" 2> /dev/null
 if [ $? -eq 0 ]; then
     echo "ERROR: sign without fingerprint should fail"
     exit 1
@@ -108,7 +122,7 @@ set -e
 # 6. embed generates a working key.go: compile and verify with it
 echo "---- 6. lkctl embed + compile check ----"
 mkdir -p "$TEST_DIR/embedcheck"
-$LKCTL embed --public-key "$PUBLIC_KEY" --out "$TEST_DIR/embedcheck/key_embedded.go" --package main
+$LKCTL embed --public-key "$(to_native_path "$PUBLIC_KEY")" --out "$(to_native_path "$TEST_DIR/embedcheck/key_embedded.go")" --package main
 
 cat > "$TEST_DIR/embedcheck/main.go" <<'EOF'
 package main
@@ -136,17 +150,6 @@ func main() {
 }
 EOF
 
-# Convert a path for consumption by native Windows executables (go.exe / check.exe)
-to_native_path() {
-    if [ -n "$WSL_DISTRO_NAME" ] && command -v wslpath > /dev/null 2>&1; then
-        wslpath -w "$1" | sed 's|\\|/|g'
-    elif [ -n "$MSYSTEM" ] && command -v cygpath > /dev/null 2>&1; then
-        cygpath -m "$1"
-    else
-        echo "$1"
-    fi
-}
-
 # go.mod with a local replace so no network access is needed
 GO_BIN=$(command -v go || command -v go.exe || true)
 if [ -z "$GO_BIN" ]; then
@@ -158,9 +161,9 @@ module embedcheck
 
 go 1.23
 
-require github.com/cuilan/license-key-verify v0.0.0
+require github.com/cuilan/license-key-verify/v2 v2.0.0
 
-replace github.com/cuilan/license-key-verify => $ROOT_WIN
+replace github.com/cuilan/license-key-verify/v2 => $ROOT_WIN
 EOF
 
     CHECK_ARG=$(to_native_path "$LICENSE_FILE")

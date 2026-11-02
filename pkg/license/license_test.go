@@ -171,6 +171,73 @@ func TestSignRequiresFingerprint(t *testing.T) {
 	}
 }
 
+func TestSignRejectsMalformedFingerprint(t *testing.T) {
+	privateKeyPEM := setupTestKey(t)
+
+	for _, fp := range []string{
+		"abc",                   // 太短
+		strings.Repeat("a", 65), // 太长
+		strings.Repeat("z", 64), // 非十六进制字符
+	} {
+		if _, err := Sign(&SignOptions{Fingerprint: fp}, privateKeyPEM); err == nil {
+			t.Errorf("Sign() with malformed fingerprint %q should fail", fp)
+		}
+	}
+
+	if _, err := Sign(&SignOptions{Fingerprint: strings.Repeat("A", 64)}, privateKeyPEM); err != nil {
+		t.Errorf("Sign() with uppercase hex fingerprint should succeed, got %v", err)
+	}
+}
+
+func TestVerifyAllowsSmallClockSkew(t *testing.T) {
+	privateKeyPEM := setupTestKey(t)
+	localFP, err := machine.Fingerprint()
+	if err != nil {
+		t.Skipf("machine fingerprint unavailable: %v", err)
+	}
+
+	// 签发时间比本机时间晚 2 分钟（模拟签发机时钟略快），应仍在容差内
+	lic := signTestLicense(t, privateKeyPEM, &SignOptions{
+		Fingerprint: localFP,
+		IssuedAt:    time.Now().Add(2 * time.Minute),
+		Duration:    time.Hour,
+	})
+	data, err := lic.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+	if result := Verify(data); !result.Valid {
+		t.Errorf("license within clock skew tolerance should be valid, got: %s", result.Error)
+	}
+
+	// 超出容差（未来 2 小时）仍应拒绝
+	lic = signTestLicense(t, privateKeyPEM, &SignOptions{
+		Fingerprint: localFP,
+		IssuedAt:    time.Now().Add(2 * time.Hour),
+		Duration:    time.Hour,
+	})
+	data, err = lic.Encode()
+	if err != nil {
+		t.Fatalf("Encode() error = %v", err)
+	}
+	if result := Verify(data); result.Valid {
+		t.Error("license issued far in the future should be rejected")
+	}
+}
+
+func TestResultHasFeature(t *testing.T) {
+	r := Result{License: &License{Features: []string{"full", "api"}}}
+	if !r.HasFeature("full") {
+		t.Error("HasFeature(full) should be true")
+	}
+	if r.HasFeature("missing") {
+		t.Error("HasFeature(missing) should be false")
+	}
+	if (Result{}).HasFeature("full") {
+		t.Error("HasFeature should be false when License is nil")
+	}
+}
+
 func TestVerifyFileAndSave(t *testing.T) {
 	privateKeyPEM := setupTestKey(t)
 	localFP, err := machine.Fingerprint()

@@ -19,6 +19,9 @@ var (
 	globalKey *rsa.PublicKey
 )
 
+// issuedAtTolerance 允许的签发时间偏差（客户机时钟落后于签发机时不会误判未生效）。
+const issuedAtTolerance = 5 * time.Minute
+
 // UsePublicKeyPEM 用指定的 PEM 公钥覆盖内置公钥。
 // 直接引用本模块（未 fork 替换 key.go）的项目，必须在首次验证前调用。
 func UsePublicKeyPEM(publicKeyPEM []byte) error {
@@ -44,7 +47,8 @@ func currentKey() (*rsa.PublicKey, error) {
 }
 
 // HasEmbeddedKey 返回当前二进制是否内嵌了可用公钥。
-// fork 本仓库后未执行 lkctl embed 时为 false，验证与签发防呆检查都会失败。
+// 未内嵌时（例如直接引用本模块、或 fork 后未执行 lkctl embed），
+// 验证需要显式传入 --public-key，应用侧需先调用 UsePublicKeyPEM。
 func HasEmbeddedKey() bool {
 	key, err := currentKey()
 	return err == nil && key != nil
@@ -106,7 +110,9 @@ func Verify(data []byte) Result {
 	result.License = &lic
 
 	now := time.Now()
-	if now.Before(lic.IssuedAt) {
+	// 容差：签发机与客户机时钟可能有几秒到几分钟偏差，
+	// 避免刚签发的许可证在客户机上被误判为"尚未生效"。
+	if now.Add(issuedAtTolerance).Before(lic.IssuedAt) {
 		result.Error = "license is not yet valid"
 		return result
 	}

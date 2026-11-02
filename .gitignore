@@ -31,4 +31,3 @@ test_run/
 .DS_Store
 logs
 vendor
-key.go

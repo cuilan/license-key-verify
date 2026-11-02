@@ -1,6 +1,10 @@
 name: CI
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       run_tests:
@@ -18,6 +22,7 @@ jobs:
   test:
     name: 测试
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_tests }}
     steps:
     - name: 检出代码
       uses: actions/checkout@v4
@@ -68,7 +73,7 @@ jobs:
     name: 构建
     runs-on: ubuntu-latest
     needs: test
-    if: ${{ inputs.build_all_platforms == true }}
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_all_platforms }}
     steps:
     - name: 检出代码
       uses: actions/checkout@v4

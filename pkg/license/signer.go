@@ -20,6 +20,9 @@ func Sign(options *SignOptions, privateKeyPEM []byte) (*License, error) {
 	if options.Fingerprint == "" {
 		return nil, fmt.Errorf("fingerprint is required (run 'lkctl fingerprint' or the app with --fingerprint)")
 	}
+	if err := validateFingerprint(options.Fingerprint); err != nil {
+		return nil, err
+	}
 
 	privateKey, err := crypto.LoadPrivateKeyFromPEM(privateKeyPEM)
 	if err != nil {
@@ -89,6 +92,21 @@ func (l *License) Save(path string) error {
 	}
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return fmt.Errorf("failed to write license file: %v", err)
+	}
+	return nil
+}
+
+// validateFingerprint 校验指纹格式：64 位十六进制（SHA-256）。
+// 指纹填错会签出永远无法通过验证的许可证，因此在签发前拦截。
+func validateFingerprint(fp string) error {
+	if len(fp) != 64 {
+		return fmt.Errorf("invalid fingerprint: expected 64 hex characters, got %d", len(fp))
+	}
+	for _, r := range fp {
+		isHex := (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')
+		if !isHex {
+			return fmt.Errorf("invalid fingerprint: contains non-hex character %q", r)
+		}
 	}
 	return nil
 }

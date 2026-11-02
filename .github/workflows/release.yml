@@ -47,6 +47,13 @@ jobs:
     - name: 创建发布包
       run: make release
 
+    - name: Generate checksums
+      run: |
+        set -e
+        cd dist/release
+        sha256sum ./*.zip > SHA256SUMS.txt
+        cat SHA256SUMS.txt
+
     - name: Generate release notes
       run: |
         set -e
@@ -73,6 +80,7 @@ jobs:
         body_path: /tmp/release_notes.md
         files: |
           dist/release/*.zip
+          dist/release/SHA256SUMS.txt
         draft: false
         prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
       env:

@@ -24,6 +24,8 @@ License signing and verification for software licensing: **one-line integration,
 
 Grab the archive for your platform from the [Releases](https://github.com/cuilan/license-key-verify/releases/latest) page and extract it — you get the `lkctl` binary (`lkctl.exe` on Windows). No installation needed; optionally add it to your `PATH`.
 
+Optional: verify the download with the `SHA256SUMS.txt` published alongside (`sha256sum -c SHA256SUMS.txt`; on Windows compare with `certutil -hashfile`).
+
 ### 2. Generate a key pair (on your machine)
 
 ```bash
@@ -204,6 +206,9 @@ err = lic.Save("license.lic")
 result := license.VerifyFile("license.lic")
 if result.Valid {
     fmt.Println("days remaining:", result.ExpiresIn/(24*3600))
+    if result.HasFeature("full") {
+        // enable functionality based on the licensed feature
+    }
 }
 ```
 

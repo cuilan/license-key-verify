@@ -1,3 +1,21 @@
+## 2.0.1 (2026-11-02)
+
+### 修复
+
+- **e2e 模块路径**：`tests/e2e_test.sh` 生成的临时模块仍使用旧模块路径，导致 `go mod tidy` 转而下载远程模块、测试不再验证本地代码
+- **e2e 路径转换（WSL）**：WSL 下把 `/mnt/c/...` 直接传给 Windows 版 `lkctl.exe`，文件被写到 `C:\mnt\c\...`；现统一经 `to_native_path()` 转换（Git Bash / Linux 行为不变）
+
+### 变更
+
+- **签发前校验指纹格式**（`license.Sign` 与 `lkctl sign`）：必须是 64 位十六进制，避免签出永远无法验证的许可证
+- **生效时间容差**：`issued_at` 允许 5 分钟时钟偏差，避免签发机与客户机时钟略有差异时误报 "not yet valid"
+- **新增 `Result.HasFeature(name)`**：按 features 列表做功能开关判断
+- **CI 增加 push / pull_request 触发**（此前仅支持手动触发）
+- **Release 增加 `SHA256SUMS.txt`**：便于校验下载产物
+- **`make` 版本号**：改用 `git describe --tags --always --dirty`，未打 tag 的提交与脏工作区会显示为 `2.0.0-3-gxxxxxxx-dirty`，不再统一显示最近的 tag
+- **`.gitignore` 不再忽略 `key.go`**：fork 场景下 `lkctl embed` 生成的 `pkg/license/key.go` 需要提交，否则 CI 从干净 checkout 构建时缺少内嵌公钥
+- **新增 `SECURITY.md`**：威胁模型、私钥保管、密钥轮换与吊销策略
+
 ## 2.0.0 (2026-10-29)
 
 破坏性重构：一行集成、零密钥文件、纯 RSA 签名。

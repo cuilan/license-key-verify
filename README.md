@@ -24,6 +24,8 @@
 
 从 [Releases](https://github.com/cuilan/license-key-verify/releases/latest) 下载对应平台的压缩包并解压，得到 `lkctl` 可执行文件（Windows 为 `lkctl.exe`）。无需安装，直接运行即可；也可以放进 `PATH` 方便使用。
 
+可选：用同目录的 `SHA256SUMS.txt` 校验下载完整性（`sha256sum -c SHA256SUMS.txt`，Windows 可用 `certutil -hashfile` 手动比对）。
+
 ### 2. 生成密钥对（你本地）
 
 ```bash
@@ -203,6 +205,9 @@ err = lic.Save("license.lic")
 result := license.VerifyFile("license.lic")
 if result.Valid {
     fmt.Println("剩余天数:", result.ExpiresIn/(24*3600))
+    if result.HasFeature("full") {
+        // 按授权功能开关能力
+    }
 }
 ```
 

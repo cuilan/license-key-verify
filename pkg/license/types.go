@@ -29,6 +29,20 @@ type Result struct {
 	Matched     bool     `json:"matched"`           // 指纹是否匹配
 }
 
+// HasFeature 返回许可证是否包含指定功能。
+// 仅在签名通过（License 已填充）且功能在列表内时返回 true。
+func (r Result) HasFeature(feature string) bool {
+	if r.License == nil {
+		return false
+	}
+	for _, f := range r.License.Features {
+		if f == feature {
+			return true
+		}
+	}
+	return false
+}
+
 // SignOptions 签发选项
 type SignOptions struct {
 	LicenseID   string        // 可选，留空自动生成

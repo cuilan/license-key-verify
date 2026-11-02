@@ -1,8 +1,10 @@
 # License Key Verify Tool Makefile
 
-# Project info (falls back to 0.0.0 when no tag exists)
+# Project info
+# VERSION uses the nearest tag; commits after a tag and dirty trees are visible
+# as e.g. "2.0.0-3-gabc1234-dirty" instead of silently reporting the tag.
 PROJECT_NAME = license-key-verify
-VERSION = $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+VERSION = $(shell git describe --tags --always --dirty 2>/dev/null | sed 's/^v//')
 BUILD_TIME = $(shell date +%Y-%m-%d_%H:%M:%S)
 GIT_COMMIT = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 ifeq ($(strip $(VERSION)),)
