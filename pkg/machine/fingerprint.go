@@ -2,6 +2,12 @@
 // 指纹由「稳定标识（平台 UUID / machine-id）+ 所有物理网卡 MAC（排序后拼接）」
 // 经 SHA-256 计算得到，同一台机器重复计算结果一致，不同机器结果不同。
 //
+// 「物理网卡」是刻意收紧的口径（见 isPhysicalInterface）：
+//   - 只统计挂在真实总线上的网卡，虚拟网卡一律排除。容器启停产生的 veth、
+//     Docker 网桥、bond/VLAN、tun/tap、VPN 隧道都不会让指纹抖动；
+//   - 统计时不看 UP/DOWN 状态。插上一块新网卡（哪怕没插网线、没配 IP）
+//     指纹立刻变化，许可证随之失效——这是"锁死硬件"的预期行为。
+//
 // 容器内场景：
 //
 //	默认宿主标识路径在容器中不可见。如果容器通过 bind mount 暴露了宿主硬件信息，
@@ -23,6 +29,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -30,7 +37,10 @@ import (
 
 // fingerprintVersion 指纹算法版本号，参与哈希计算。
 // 修改采集逻辑时递增，避免新旧版本指纹混淆。
-const fingerprintVersion = "lkfp-v1"
+//
+//	lkfp-v1  统计所有非回环且 UP 的网卡（含 veth / docker0 等虚拟网卡）
+//	lkfp-v2  只统计物理网卡，且不看 UP/DOWN（见 isPhysicalInterface）
+const fingerprintVersion = "lkfp-v2"
 
 // 宿主信息 bind mount 路径前缀。容器启动时可通过 --mount 把宿主硬件信息挂到 /host/ 下。
 // 例如 --mount type=bind,source=/etc/machine-id,target=/host/etc/machine-id,readonly
@@ -95,29 +105,93 @@ func StableID() (string, error) {
 	}
 }
 
-// MACAddresses 返回所有 UP 状态、非回环网卡的 MAC 地址（小写、排序），保证顺序稳定。
+// MACAddresses 返回所有物理网卡的 MAC 地址（小写、排序），保证顺序稳定。
 //
-// 容器内如果用了 --network host，net.Interfaces() 直接返回宿主物理网卡的 MAC——
-// 这时容器内指纹 = 宿主裸机指纹，docker save 到新宿主机后必然不同。
-// 如果用的是容器默认 bridge 网络，拿到的是容器 veth pair 的 MAC，每次 docker run 可能不同。
+// 与 v1 的区别：
+//   - 只看物理网卡（isPhysicalInterface），虚拟网卡不参与；
+//   - 不看 UP/DOWN，网卡插上但没启用也算。
+//
+// 这样容器重建、Docker 启停、VPN 连接都不会改变指纹，
+// 而物理上新增/拆除/更换一块网卡会立刻改变指纹。
 func MACAddresses() ([]string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get network interfaces: %v", err)
 	}
+	return interfaceMACs(interfaces, isPhysicalInterface), nil
+}
 
+// interfaceMACs 从网卡列表中挑出物理网卡的 MAC。
+// 拆成纯函数便于测试（注入 isPhysical，不需要真实网卡）。
+func interfaceMACs(ifaces []net.Interface, isPhysical func(name string, iface net.Interface) bool) []string {
 	var macs []string
-	for _, iface := range interfaces {
-		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		if !isPhysical(iface.Name, iface) {
 			continue
 		}
 		mac := strings.ToLower(iface.HardwareAddr.String())
-		if mac != "" && mac != "00:00:00:00:00:00" {
-			macs = append(macs, mac)
+		if mac == "" || mac == "00:00:00:00:00:00" {
+			continue
 		}
+		macs = append(macs, mac)
 	}
 	sort.Strings(macs)
-	return macs, nil
+	return macs
+}
+
+// isPhysicalInterface 判断是否是物理网卡。
+//
+// Linux 的判据是 /sys/class/net/<name>/device 这个符号链接是否存在：
+// 只有挂在真实总线（PCI / USB / platform）上的网卡才有，它指向网卡的总线设备。
+// veth、docker0、br-*、bond 主设备、VLAN 子接口、tun/tap、virbr、tailscale0、
+// wg0 这类虚拟设备都没有该链接，因此一律被排除——容器启停不会让指纹抖动。
+//
+// 注意边界情况：
+//   - bond 主设备被排除，但从设备（eth0/eth1…）各自都被统计，
+//     所以给 bond 增加一块从网卡同样会改变指纹；
+//   - VLAN 子接口被排除，物理父接口会被统计；
+//   - 容器内（除非 privileged 且 /sys 完整映射）通常读不到 device 链接，
+//     此时退化为「只用稳定标识」，与 v1 的容器行为一致。
+//
+// Windows / macOS 没有 /sys，退回按网卡名的虚拟设备前缀排除（见各自列表）。
+func isPhysicalInterface(name string, iface net.Interface) bool {
+	switch runtime.GOOS {
+	case "linux":
+		_, err := os.Stat(filepath.Join("/sys/class/net", name, "device"))
+		return err == nil
+	case "windows":
+		return !hasAnyPrefix(strings.ToLower(name), windowsVirtualPrefixes)
+	case "darwin":
+		return !hasAnyPrefix(strings.ToLower(name), darwinVirtualPrefixes)
+	default:
+		return true
+	}
+}
+
+// windowsVirtualPrefixes Windows 上虚拟网卡的名字前缀（小写比较）。
+// Hyper-V / WSL / VPN / 虚拟化软件创建的适配器都带这些前缀。
+var windowsVirtualPrefixes = []string{
+	"vethernet", "loopback", "virtual", "hyper-v", "vmware", "virtualbox",
+	"tap-", "npcap", "tailscale", "zerotier", "wireguard", "bluetooth", "wsl",
+}
+
+// darwinVirtualPrefixes macOS 上虚拟网卡的名字前缀（小写比较）。
+// en0/en1（有线/无线）是真机网卡，其余多为隧道或桥接设备。
+var darwinVirtualPrefixes = []string{
+	"utun", "bridge", "awdl", "llw", "ap", "gif", "stf", "p2p", "anpi", "vmenet",
+}
+
+// hasAnyPrefix 判断 s 是否以 prefixes 中任一项开头。
+func hasAnyPrefix(s string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Fingerprint 计算当前机器的指纹（64 位十六进制 SHA-256）。
